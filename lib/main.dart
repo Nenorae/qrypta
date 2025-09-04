@@ -95,51 +95,53 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) async {
     super.didChangeAppLifecycleState(state);
-    
-    final hasWallet = ref.read(authStateProvider).valueOrNull ?? false;
-    
+
     switch (state) {
       case AppLifecycleState.resumed:
         print('App resumed from background');
-        
+
+        // Await the authStateProvider to resolve the race condition.
+        // This ensures we have the correct wallet status before checking the lock timeout.
+        final hasWallet = await ref.read(authStateProvider.future);
+
         if (hasWallet) {
           final prefs = await SharedPreferences.getInstance();
           final lastActiveString = prefs.getString(_lastActiveKey);
-          
+
           if (lastActiveString != null) {
             final lastActive = DateTime.parse(lastActiveString);
             final now = DateTime.now();
             final difference = now.difference(lastActive).inMinutes;
-            
-            // Lock jika sudah tidak aktif lebih dari threshold
+
+            // Lock if the app has been inactive for longer than the threshold
             if (difference >= _lockTimeoutMinutes) {
               ref.read(appLockedProvider.notifier).state = true;
             }
           } else {
-            // Jika tidak ada timestamp, lock aplikasi
+            // If there's no timestamp, lock the app for safety
             ref.read(appLockedProvider.notifier).state = true;
           }
         }
-        
+
         await _updateLastActiveTime();
         break;
-        
+
       case AppLifecycleState.paused:
         print('App moved to background');
         await _updateLastActiveTime();
         break;
-        
+
       case AppLifecycleState.inactive:
         print('App became inactive');
-        // Update time saat aplikasi menjadi inactive
+        // Update time when the app becomes inactive
         await _updateLastActiveTime();
         break;
-        
+
       case AppLifecycleState.detached:
         print('App is being terminated');
         await _markAppAsTerminated();
         break;
-        
+
       case AppLifecycleState.hidden:
         print('App is hidden');
         await _updateLastActiveTime();
