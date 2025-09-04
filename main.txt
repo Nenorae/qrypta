@@ -1,0 +1,75 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qrypta/src/core/config/theme/app_theme.dart';
+import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
+import 'package:qrypta/src/features/authentication/presentation/screens/auth_wrapper.dart';
+import 'package:qrypta/src/features/authentication/presentation/screens/pin_verification_screen.dart';
+import 'package:qrypta/src/features/wallet/presentation/providers/wallet_providers.dart';
+// Global key for navigation
+final navigatorKey = GlobalKey<NavigatorState>();
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ProviderScope(child: MyApp()));
+}
+
+class MyApp extends ConsumerStatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  ConsumerState createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  bool _isFirstResume = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    // Check if user has existing wallet
+    final hasWallet = await ref.read(walletProvider.notifier).checkExistingWallet();
+    ref.read(authStateProvider.notifier).update((state) => hasWallet);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_isFirstResume) {
+        _isFirstResume = false;
+        return;
+      }
+
+      final hasWallet = ref.read(authStateProvider).valueOrNull ?? false;
+      if (hasWallet) {
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (context) => const PinVerificationScreen(),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: 'Qrypta',
+      theme: AppTheme.darkTheme,
+      debugShowCheckedModeBanner: false,
+      home: const AuthWrapper(),
+    );
+  }
+}

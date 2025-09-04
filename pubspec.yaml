@@ -1,0 +1,37 @@
+name: qrypta
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  pinput: ^5.0.1
+  shared_preferences: ^2.5.3
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.0.1
+  share_plus: ^11.0.0
+  web3dart: ^2.7.1
+  flutter_secure_storage: ^9.2.4
+  flutter_riverpod: ^2.6.1
+  http: ^1.4.0
+  convert: ^3.1.2
+  crypto: ^3.0.6
+  provider: ^6.1.5
+  local_auth: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/fonts/
