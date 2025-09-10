@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/pin_provider.dart';
-import 'package:qrypta/src/features/home/presentation/screens/home_screen.dart';
+import 'package:qrypta/src/features/home/presentation/screens/home_screen_backup.dart';
 
 class WalletSetupPinConfirmationScreen extends ConsumerWidget {
   final String pin;
