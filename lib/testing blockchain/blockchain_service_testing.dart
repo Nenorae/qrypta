@@ -1,11 +1,10 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart';
 import 'package:web3dart/web3dart.dart';
 
 class BlockchainService {
   // Alamat RPC dari Nginx load balancer yang mengarah ke node Besu
-  final String _rpcUrl = "http://100.92.191.4:8556"; 
+  final String _rpcUrl = "http://100.92.191.4:8556";
 
   late Web3Client _client;
 

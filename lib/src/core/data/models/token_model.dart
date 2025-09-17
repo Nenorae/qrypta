@@ -12,4 +12,20 @@ class Token {
     required this.decimals,
     this.balance,
   });
+
+  Token copyWith({
+    String? contractAddress,
+    String? name,
+    String? symbol,
+    int? decimals,
+    BigInt? balance,
+  }) {
+    return Token(
+      contractAddress: contractAddress ?? this.contractAddress,
+      name: name ?? this.name,
+      symbol: symbol ?? this.symbol,
+      decimals: decimals ?? this.decimals,
+      balance: balance ?? this.balance,
+    );
+  }
 }

@@ -155,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
               BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
               BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
               BottomNavigationBarItem(icon: Icon(Icons.qr_code_scanner), label: 'Scan'),
-              BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: 'Stats'),
+              BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Discover'),
               BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
             ],
           ),
