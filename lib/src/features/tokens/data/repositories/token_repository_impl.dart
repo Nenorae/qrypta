@@ -2,7 +2,7 @@
 
 // Hapus import 'package:web3dart/web3dart.dart; karena tidak lagi dibutuhkan di sini.
 import '../../../../core/data/models/token_model.dart';
-import '../../../../core/services/blockchain_service.dart'; // Ganti path jika perlu
+import '../../../../core/services/blockchain/blockchain_service.dart'; // Ganti path jika perlu
 import '../../domain/repositories/token_repository.dart';
 import '../datasources/token_local_data_source.dart';
 
@@ -28,14 +28,15 @@ class TokenRepositoryImpl implements TokenRepository {
   Future<Token> getTokenDetails(String contractAddress) async {
     // Tugas sepenuhnya didelegasikan ke BlockchainService.
     // Repositori tidak perlu tahu cara kerja web3dart.
-    final detailsMap = await blockchainService.getTokenDetails(contractAddress);
+    final detailsMap =
+        await blockchainService.erc20.getTokenDetails(contractAddress);
 
     // Repositori bertanggung jawab mengubah Map menjadi objek Model
     return Token(
       name: detailsMap['name'] as String,
       symbol: detailsMap['symbol'] as String,
       decimals: detailsMap['decimals'] as int,
-      contractAddress: detailsMap['address'] as String,
+      contractAddress: contractAddress,
     );
   }
 
@@ -45,13 +46,14 @@ class TokenRepositoryImpl implements TokenRepository {
     required String walletAddress,
   }) async {
     // Delegasi penuh ke BlockchainService.
-    return blockchainService.getErc20Balance(contractAddress, walletAddress);
+    return blockchainService.erc20
+        .getErc20Balance(contractAddress, walletAddress);
   }
 
   @override
   Future<bool> validateTokenContract(String contractAddress) async {
     // Delegasi penuh ke BlockchainService.
-    return blockchainService.validateTokenContract(contractAddress);
+    return blockchainService.erc20.validateTokenContract(contractAddress);
   }
 
   // =======================================================

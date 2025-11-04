@@ -1,6 +1,6 @@
 
 import 'package:flutter/material.dart';
-import 'package:qrypta/src/core/services/blockchain_service.dart';
+import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
 
 class TestConnectionPage extends StatefulWidget {
   const TestConnectionPage({super.key});
@@ -20,7 +20,7 @@ class _TestConnectionPageState extends State<TestConnectionPage> {
     });
 
     final blockchainService = BlockchainService();
-    final result = await blockchainService.getBlockchainInfo();
+    final result = await blockchainService.BlockchainService();
 
     setState(() {
       _connectionStatus = result;
