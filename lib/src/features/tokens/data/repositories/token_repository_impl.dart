@@ -1,17 +1,14 @@
 // lib/src/features/tokens/data/repositories/token_repository_impl.dart
 
-// Hapus import 'package:web3dart/web3dart.dart; karena tidak lagi dibutuhkan di sini.
 import '../../../../core/data/models/token_model.dart';
-import '../../../../core/services/blockchain/blockchain_service.dart'; // Ganti path jika perlu
+import '../../../../core/services/blockchain/blockchain_service.dart';
 import '../../domain/repositories/token_repository.dart';
 import '../datasources/token_local_data_source.dart';
 
-/// Implementasi dari TokenRepository.
-/// Kelas ini berfungsi sebagai jembatan yang mengorkestrasi data dari
-/// BlockchainService (untuk data on-chain) dan TokenLocalDataSource (untuk data di perangkat).
+/// Implementation of [TokenRepository].
+/// Acts as a bridge between [BlockchainService] (on-chain data)
+/// and [TokenLocalDataSource] (local device data).
 class TokenRepositoryImpl implements TokenRepository {
-  // --- DEPENDENSI BARU ---
-  // Tidak lagi bergantung pada Web3Client, melainkan service yang lebih tinggi.
   final BlockchainService blockchainService;
   final TokenLocalDataSource localDataSource;
 
@@ -20,22 +17,18 @@ class TokenRepositoryImpl implements TokenRepository {
     required this.localDataSource,
   });
 
-  // =======================================================
-  // ==           OPERASI BLOCKCHAIN (Delegasi)           ==
-  // =======================================================
+  // blockchain operation
 
   @override
   Future<Token> getTokenDetails(String contractAddress) async {
-    // Tugas sepenuhnya didelegasikan ke BlockchainService.
-    // Repositori tidak perlu tahu cara kerja web3dart.
-    final detailsMap =
-        await blockchainService.erc20.getTokenDetails(contractAddress);
+    final details = await blockchainService.erc20.getTokenDetails(
+      contractAddress,
+    );
 
-    // Repositori bertanggung jawab mengubah Map menjadi objek Model
     return Token(
-      name: detailsMap['name'] as String,
-      symbol: detailsMap['symbol'] as String,
-      decimals: detailsMap['decimals'] as int,
+      name: details['name'] as String,
+      symbol: details['symbol'] as String,
+      decimals: details['decimals'] as int,
       contractAddress: contractAddress,
     );
   }
@@ -45,53 +38,64 @@ class TokenRepositoryImpl implements TokenRepository {
     required String contractAddress,
     required String walletAddress,
   }) async {
-    // Delegasi penuh ke BlockchainService.
-    return blockchainService.erc20
-        .getErc20Balance(contractAddress, walletAddress);
+    return blockchainService.erc20.getErc20Balance(
+      contractAddress,
+      walletAddress,
+    );
   }
 
   @override
   Future<bool> validateTokenContract(String contractAddress) async {
-    // Delegasi penuh ke BlockchainService.
     return blockchainService.erc20.validateTokenContract(contractAddress);
   }
 
-  // =======================================================
-  // ==        OPERASI PENYIMPANAN LOKAL (Delegasi)       ==
-  // =======================================================
+  // local operation
 
   @override
   Future<void> saveManualToken(Token token) async {
-    // Tidak ada perubahan, tetap mendelegasikan ke data source lokal.
     await localDataSource.addTokenAddress(token.contractAddress);
   }
 
   @override
   Future<void> removeToken(String contractAddress) async {
-    // Tidak ada perubahan, tetap mendelegasikan ke data source lokal.
     await localDataSource.removeTokenAddress(contractAddress);
   }
 
   @override
-  Future<List<Token>> getSavedTokens() async {
-    // 1. Ambil daftar alamat dari penyimpanan lokal (DataSource)
+  Future<List<Token>> getSavedTokens(String walletAddress) async {
     final addresses = await localDataSource.getTokenAddresses();
-
-    if (addresses.isEmpty) {
-      return [];
-    }
-
-    // 2. Untuk setiap alamat, ambil detail lengkapnya dari Blockchain (melalui Service)
-    //    Metode ini memanggil `getTokenDetails` miliknya sendiri, yang sudah didelegasikan.
-    final tokenFutures =
-        addresses.map((addr) => getTokenDetails(addr)).toList();
+    if (addresses.isEmpty) return [];
 
     try {
-      final tokens = await Future.wait(tokenFutures);
-      return tokens;
+      final detailFutures =
+          addresses.map((addr) => getTokenDetails(addr)).toList();
+
+      final balanceFutures =
+          addresses
+              .map(
+                (addr) => fetchTokenBalance(
+                  contractAddress: addr,
+                  walletAddress: walletAddress,
+                ),
+              )
+              .toList();
+
+      final tokens = await Future.wait(detailFutures);
+      final balances = await Future.wait(balanceFutures);
+
+      final result = List<Token>.generate(tokens.length, (i) {
+        return Token(
+          name: tokens[i].name,
+          symbol: tokens[i].symbol,
+          decimals: tokens[i].decimals,
+          contractAddress: tokens[i].contractAddress,
+          balance: balances[i],
+        );
+      });
+
+      return result;
     } catch (e) {
-      print('Error fetching saved tokens details: $e');
-      // Berikan feedback bahwa beberapa token mungkin gagal dimuat
+      print('Error fetching token data: $e');
       return [];
     }
   }
