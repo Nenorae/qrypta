@@ -7,10 +7,17 @@ import 'package:qrypta/src/features/authentication/presentation/providers/auth_p
 import 'package:qrypta/src/features/authentication/presentation/screens/auth_wrapper.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/pin_verification_screen.dart';
 import 'package:qrypta/src/features/home/presentation/screens/home_screen_backup.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: MyApp()));
+  final sharedPrefs = await SharedPreferences.getInstance();
+  runApp(ProviderScope(
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(sharedPrefs),
+    ],
+    child: const MyApp(),
+  ));
 }
 
 // 1. Root Widget Aplikasi

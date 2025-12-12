@@ -1,144 +1,116 @@
-// lib/src/features/tokens/presentation/providers/token_provider.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../domain/entities/token.dart';
-// Usecase lain
-import '../../domain/usecases/get_saved_tokens.dart';
-import '../../domain/usecases/get_token_details.dart';
-import '../../../../core/services/blockchain/blockchain_service.dart'; // Ganti path jika perlu
 
-// ==========================================================
-// INI ADALAH PERBAIKAN IMPORT ANDA
-import '../../domain/usecases/add_manual_custom_token.dart'; // <-- DIUBAH
-// ==========================================================
+import '../../../../core/data/models/token_model.dart';
+import '../../domain/repositories/token_repository.dart';
+import '../../domain/usecases/get_user_tokens.dart';
+import '../../domain/usecases/add_manual_custom_token.dart';
+import '../../domain/usecases/remove_custom_token.dart';
 
-/// Notifier untuk mengelola state daftar token pengguna.
-///
-/// State yang dikelola adalah `AsyncValue<List<Token>>` untuk menangani
-/// kondisi loading, data, dan error secara asynchronous.
+import '../../data/repositories/token_repository_impl.dart';
+import '../../data/datasources/token_local_data_source_impl.dart';
+
+import '../../../../core/services/blockchain/blockchain_service.dart';
+
+import '../../../authentication/presentation/providers/auth_providers.dart';
+
+final tokenLocalDataSourceProvider = Provider((ref) {
+  final sharedPreferencesPrefs = ref.watch(sharedPreferencesProvider);
+  return TokenLocalDataSourceImpl(sharedPreferences: sharedPreferencesPrefs);
+});
+
+final blockchainServiceProvider = Provider((ref) {
+  return BlockchainService();
+});
+
+final tokenRepositoryProvider = Provider<TokenRepository>((ref) {
+  final local = ref.watch(tokenLocalDataSourceProvider);
+  final chain = ref.watch(blockchainServiceProvider);
+  return TokenRepositoryImpl(localDataSource: local, blockchainService: chain);
+});
+
+final getUserTokensUseCaseProvider = Provider<GetUserTokensUseCase>((ref) {
+  return GetUserTokensUseCase(ref.watch(tokenRepositoryProvider));
+});
+
+final addManualTokenUseCaseProvider = Provider<AddManualTokenUseCase>((ref) {
+  return AddManualTokenUseCase(ref.watch(tokenRepositoryProvider));
+});
+
+final removeCustomTokenUseCaseProvider = Provider<RemoveCustomTokenUseCase>((ref) {
+  return RemoveCustomTokenUseCase(ref.watch(tokenRepositoryProvider));
+});
+
 class TokenNotifier extends StateNotifier<AsyncValue<List<Token>>> {
-  // ==========================================================
-  // INI ADALAH PERBAIKAN TIPE PROPERTI
-  final AddManualCustomToken _addManualTokenUseCase; // <-- DIUBAH
-  // ==========================================================
-  final GetSavedTokens _getSavedTokensUseCase;
-  final GetTokenDetails _getTokenDetailsUseCase;
-  final String _walletAddress;
+  final AddManualTokenUseCase _addManual;
+  final GetUserTokensUseCase _getTokens;
+  final RemoveCustomTokenUseCase _removeToken;
+  final Ref _ref;
 
   TokenNotifier({
-    // ==========================================================
-    // INI ADALAH PERBAIKAN TIPE PARAMETER
-    required AddManualCustomToken addManualTokenUseCase, // <-- DIUBAH
-    // ==========================================================
-    required GetSavedTokens getSavedTokensUseCase,
-    required GetTokenDetails getTokenDetailsUseCase,
-    required String walletAddress,
-  }) : _addManualTokenUseCase = addManualTokenUseCase,
-       _getSavedTokensUseCase = getSavedTokensUseCase,
-       _getTokenDetailsUseCase = getTokenDetailsUseCase,
-       _walletAddress = walletAddress,
-       super(const AsyncValue.loading()) {
-    // Langsung muat token saat notifier diinisialisasi
+    required AddManualTokenUseCase addManualTokenUseCase,
+    required GetUserTokensUseCase getUserTokensUseCase,
+    required RemoveCustomTokenUseCase removeCustomTokenUseCase,
+    required Ref ref,
+  })  : _addManual = addManualTokenUseCase,
+        _getTokens = getUserTokensUseCase,
+        _removeToken = removeCustomTokenUseCase,
+        _ref = ref,
+        super(const AsyncValue.loading()) {
     fetchUserTokens();
   }
 
-  /// Memuat daftar token yang disimpan pengguna beserta saldonya.
   Future<void> fetchUserTokens() async {
     state = const AsyncValue.loading();
     try {
-      // Use case ini diharapkan mengembalikan List<Token> yang sudah ada saldonya.
-      final tokens = await _getSavedTokensUseCase.call(_walletAddress);
+      final privateKey = await _ref.read(getPrivateKeyUseCaseProvider).call();
+      if (privateKey == null || privateKey.isEmpty) {
+        state = const AsyncValue.data([]);
+        return;
+      }
+      final walletAddress =
+          await _ref.read(getPublicKeyUseCaseProvider).call(privateKey);
+
+      final tokens = await _getTokens.call(walletAddress: walletAddress);
       state = AsyncValue.data(tokens);
     } catch (e, s) {
       state = AsyncValue.error(e, s);
     }
   }
 
-  /// Menambahkan token baru berdasarkan alamat kontraknya.
-  ///
-  /// Metode ini akan mengambil detail token dari blockchain, menyimpannya,
-  /// lalu memperbarui state.
   Future<bool> addTokenByAddress(String contractAddress) async {
-    // Pertahankan data lama selama loading untuk UX yang lebih baik
-    final previousState = state;
+    print("Error: GetTokenDetails usecase belum tersedia");
+    return false;
+  }
+
+  Future<bool> addManualToken(Token token) async {
     state = const AsyncValue.loading();
-
     try {
-      // 1. Ambil detail token dari alamat kontrak
-      final token = await _getTokenDetailsUseCase.call(contractAddress);
-
-      // 2. Simpan token tersebut (use case ini akan menyimpannya di local storage)
-      await _addManualTokenUseCase.call(token);
-
-      // 3. Muat ulang seluruh daftar token untuk menampilkan token baru
+      await _addManual.call(token);
       await fetchUserTokens();
       return true;
     } catch (e, s) {
-      // Jika gagal, kembalikan state ke error dan tampilkan di UI
       state = AsyncValue.error(e, s);
-      // Opsi: kembalikan ke state sebelumnya jika tidak ingin menampilkan error
-      // state = previousState;
       return false;
+    }
+  }
+
+  Future<void> removeToken(String contractAddress) async {
+    state = const AsyncValue.loading();
+    try {
+      await _removeToken.call(contractAddress: contractAddress);
+      await fetchUserTokens();
+    } catch (e, s) {
+      state = AsyncValue.error(e, s);
     }
   }
 }
 
-// --- DEFINISI PROVIDER ---
-// Saya sudah memperbaiki `addManualTokenUseCaseProvider` di bawah.
-// Anda masih perlu mengganti implementasi dummy/komentar
-// dengan provider Anda yang sebenarnya.
-
-/*
-// 1. Provider untuk TokenRepository (bergantung pada implementasinya)
-final tokenRepositoryProvider = Provider<TokenRepository>((ref) {
-  // Ganti dengan implementasi konkret Anda
-  return TokenRepositoryImpl(
-    blockchainService: ref.watch(blockchainServiceProvider),
-    localDataSource: ref.watch(tokenLocalDataSourceProvider),
-  );
-});
-*/
-
-// 2. Provider untuk Use Cases
-final addManualTokenUseCaseProvider = Provider<AddManualCustomToken>((ref) {
-  // <-- DIUBAH
-  // Asumsi Anda punya `tokenRepositoryProvider` yang didefinisikan di atas
-  // return AddManualCustomToken(ref.watch(tokenRepositoryProvider));
-
-  // HANYA UNTUK CONTOH JIKA DI ATAS MASIH KOMENTAR:
-  throw UnimplementedError('Ganti ini dengan implementasi repository Anda');
-});
-
-final getSavedTokensUseCaseProvider = Provider<GetSavedTokens>((ref) {
-  // return GetSavedTokens(ref.watch(tokenRepositoryProvider));
-  throw UnimplementedError('Ganti ini dengan implementasi repository Anda');
-});
-
-final getTokenDetailsUseCaseProvider = Provider<GetTokenDetails>((ref) {
-  // return GetTokenDetails(ref.watch(tokenRepositoryProvider));
-  throw UnimplementedError('Ganti ini dengan implementasi repository Anda');
-});
-
-// 3. Provider utama untuk TokenNotifier
-final tokenNotifierProvider = StateNotifierProvider<
-  TokenNotifier,
-  AsyncValue<List<Token>>
->((ref) {
-  // Dapatkan alamat wallet dari provider lain (misal: authProvider)
-  // final walletAddress = ref.watch(authProvider).walletAddress;
-
-  // HANYA UNTUK CONTOH:
-  final walletAddress = "0xCONTOH_ALAMAT";
-  if (walletAddress == "0xCONTOH_ALAMAT") {
-    print(
-      "PERINGATAN: Harap ganti walletAddress dummy di tokenNotifierProvider",
-    );
-  }
-
+final tokenNotifierProvider =
+    StateNotifierProvider<TokenNotifier, AsyncValue<List<Token>>>((ref) {
   return TokenNotifier(
     addManualTokenUseCase: ref.watch(addManualTokenUseCaseProvider),
-    getSavedTokensUseCase: ref.watch(getSavedTokensUseCaseProvider),
-    getTokenDetailsUseCase: ref.watch(getTokenDetailsUseCaseProvider),
-    walletAddress: walletAddress,
+    getUserTokensUseCase: ref.watch(getUserTokensUseCaseProvider),
+    removeCustomTokenUseCase: ref.watch(removeCustomTokenUseCaseProvider),
+    ref: ref,
   );
 });
