@@ -18,31 +18,22 @@ import 'package:qrypta/src/core/graphql/graphql_provider.dart'
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Initialize Hive and open the box.
-  // The HiveStore from graphql_flutter defaults to using a box named 'graphql'.
+  // Initialize Hive and open the default box for graphql_flutter.
   await Hive.initFlutter();
-  final box = await Hive.openBox('graphql');
-
-  // 2. Manually create the GraphQLClient instance AFTER Hive is ready.
-  // This uses the same logic as your graphql_provider.dart but at the correct time.
-  final HttpLink httpLink = HttpLink('https://api.qrypta.id/graphql');
-  final store = HiveStore(box); // This will find the 'graphql' box opened above.
-  final cache = GraphQLCache(store: store);
-  final qlClient = GraphQLClient(link: httpLink, cache: cache);
+  await Hive.openBox('graphqlClientStore');
 
   final sharedPrefs = await SharedPreferences.getInstance();
 
-  // 3. Setup Provider Container, OVERRIDING the graphqlClientProvider
-  //    to return the instance we just safely created.
+  // The container will now create the GraphQL client using its provider.
   final container = ProviderContainer(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(sharedPrefs),
-      // Any part of the app asking for graphqlClientProvider will now get our `qlClient` instance.
-      app_graphql_provider.graphqlClientProvider.overrideWithValue(qlClient),
     ],
   );
 
-  // 4. Run the App. We pass the container to the UncontrolledProviderScope.
+  // Read the client from the provider to pass it to the GraphQLProvider widget.
+  final qlClient = container.read(app_graphql_provider.graphqlClientProvider);
+
   runApp(
     UncontrolledProviderScope(
       container: container,
