@@ -4,7 +4,7 @@ import 'dart:math';
 import '../../../../core/data/models/token_model.dart';
 
 class TokenListItem extends StatelessWidget {
-  final Token token;
+  final TokenModel token;
   final VoidCallback onDelete;
 
   const TokenListItem({
@@ -34,7 +34,7 @@ class TokenListItem extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            _formatBalance(token.balance ?? BigInt.zero, token.decimals),
+            _formatBalance(token.balance, token.decimals),
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(width: 8),

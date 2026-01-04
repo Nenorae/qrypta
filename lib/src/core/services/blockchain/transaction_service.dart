@@ -2,27 +2,99 @@
 
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:web3dart/web3dart.dart';
+import 'package:qrypta/src/core/graphql/queries.dart'; // Import queries.dart for the mutation
 
-/// Menyediakan utilitas untuk memeriksa, menunggu, dan memperkirakan biaya transaksi di blockchain.
+// Model untuk satu transaksi dari GraphQL
+class Transaction {
+  final String hash;
+  final int blockNumber;
+  final String fromAddress;
+  final String toAddress;
+  final String value; // Value dalam WEI, tetap String untuk presisi
+
+  Transaction({
+    required this.hash,
+    required this.blockNumber,
+    required this.fromAddress,
+    required this.toAddress,
+    required this.value,
+  });
+
+  factory Transaction.fromJson(Map<String, dynamic> json) {
+    return Transaction(
+      hash: json['hash'] ?? 'N/A',
+      blockNumber: int.tryParse(json['blockNumber']?.toString() ?? '0') ?? 0,
+      fromAddress: json['fromAddress'] ?? 'N/A',
+      toAddress: json['toAddress'] ?? 'N/A',
+      value: json['value'] ?? '0',
+    );
+  }
+}
+
+// Model untuk halaman transaksi yang dipaginasi dari GraphQL
+class TransactionPage {
+  final List<Transaction> transactions;
+  final int totalCount;
+
+  TransactionPage({required this.transactions, required this.totalCount});
+
+  factory TransactionPage.fromJson(Map<String, dynamic> json) {
+    var txList = json['transactions'] as List;
+    List<Transaction> transactions =
+        txList.map((i) => Transaction.fromJson(i)).toList();
+
+    return TransactionPage(
+      transactions: transactions,
+      totalCount: json['totalCount'] ?? 0,
+    );
+  }
+}
+
 class TransactionService {
   final Web3Client _client;
+  final GraphQLClient _graphQLClient;
   final String _serviceName = 'TransactionService';
 
-  TransactionService(this._client);
+  // Konstruktor diperbarui untuk menerima kedua client
+  TransactionService(this._client, this._graphQLClient);
 
-  /// Mengambil detail tanda terima (receipt) dari sebuah transaksi berdasarkan hash-nya.
-  /// Mengembalikan `null` jika transaksi belum di-mine.
-  Future<TransactionReceipt?> getTransactionReceipt(String txHash) async {
-    developer.log(
-      '[INFO] Fetching receipt for tx: $txHash',
-      name: _serviceName,
+  /// Mengirim raw signed transaction hex melalui GraphQL mutation.
+  Future<String> sendSignedTransaction(String signedTransactionHex) async {
+    developer.log('[INFO] Sending signed transaction via GraphQL', name: _serviceName);
+
+    final MutationOptions options = MutationOptions(
+      document: gql(sendRawTransactionMutation),
+      variables: <String, dynamic>{
+        'signedTransactionHex': signedTransactionHex,
+      },
+      fetchPolicy: FetchPolicy.networkOnly, // Always send to network
     );
+
     try {
-      return await _client.getTransactionReceipt(txHash);
+      final QueryResult result = await _graphQLClient.mutate(options);
+
+      if (result.hasException) {
+        developer.log(
+          '[ERROR] GraphQL mutation exception: ${result.exception.toString()}',
+          name: _serviceName,
+          error: result.exception,
+        );
+        throw result.exception!;
+      }
+
+      final String? txHash = result.data?['sendTransaction']?['txHash'] as String?;
+
+      if (txHash == null || txHash.isEmpty) {
+        developer.log('[ERROR] Transaction hash not returned by GraphQL server.', name: _serviceName);
+        throw Exception('Transaction hash not returned by GraphQL server.');
+      }
+      developer.log('[INFO] Transaction sent, hash: $txHash', name: _serviceName);
+      return txHash;
     } catch (e, s) {
       developer.log(
-        '[ERROR] Error fetching transaction receipt',
+        '[ERROR] Error sending signed transaction',
         name: _serviceName,
         error: e,
         stackTrace: s,
@@ -31,106 +103,176 @@ class TransactionService {
     }
   }
 
-  /// Menunggu hingga sebuah transaksi di-mine dan mengembalikan tanda terimanya.
-  /// Akan mengalami timeout jika menunggu terlalu lama.
-  Future<TransactionReceipt> waitForTransactionReceipt(String txHash) async {
+  /// Mengambil riwayat transaksi dari blockscan GraphQL.
+  Future<TransactionPage> getRecentTransactions({
+    required String userAddressHex,
+    int page = 1,
+    int limit = 20,
+  }) async {
     developer.log(
-      '[INFO] Waiting for receipt for tx: $txHash',
+      '[INFO] Fetching recent transactions for $userAddressHex from GraphQL (page: $page, limit: $limit)',
       name: _serviceName,
     );
+
+    final String query = r'''
+      query GetTransactions($address: String!, $page: Int, $limit: Int) {
+        getTransactionsByAddress(address: $address, page: $page, limit: $limit) {
+          transactions {
+            hash
+            blockNumber
+            fromAddress
+            toAddress
+            value
+          }
+          totalCount
+        }
+      }
+    ''';
+
+    final options = QueryOptions(
+      document: gql(query),
+      variables: {
+        'address': userAddressHex,
+        'page': page,
+        'limit': limit,
+      },
+      fetchPolicy: FetchPolicy.networkOnly, // Selalu ambil dari jaringan
+    );
+
+    try {
+      final result = await _graphQLClient.query(options);
+
+      if (result.hasException) {
+        throw result.exception!;
+      }
+
+      if (result.data == null) {
+        developer.log('[WARN] GraphQL returned null data', name: _serviceName);
+        return TransactionPage(transactions: [], totalCount: 0);
+      }
+
+      final data = result.data!['getTransactionsByAddress'];
+      final pageData = TransactionPage.fromJson(data);
+      developer.log(
+        '[INFO] Found ${pageData.transactions.length} transactions, total: ${pageData.totalCount}',
+        name: _serviceName,
+      );
+      return pageData;
+    } catch (e, s) {
+      developer.log(
+        '[ERROR] Error fetching recent transactions from GraphQL',
+        name: _serviceName,
+        error: e,
+        stackTrace: s,
+      );
+      // Mengembalikan halaman kosong jika terjadi error
+      return TransactionPage(transactions: [], totalCount: 0);
+    }
+  }
+
+  /// Mengambil detail transaksi berdasarkan hash dari blockscan GraphQL.
+  Future<Transaction?> getTransactionByHash(String txHash) async {
+    developer.log('[INFO] Fetching tx by hash from GraphQL: $txHash', name: _serviceName);
+    
+    final String query = r'''
+      query GetTransactionByHash($hash: String!) {
+        getTransactionByHash(hash: $hash) {
+          hash
+          blockNumber
+          fromAddress
+          toAddress
+          value
+        }
+      }
+    ''';
+    
+    final options = QueryOptions(
+      document: gql(query),
+      variables: {'hash': txHash},
+      fetchPolicy: FetchPolicy.networkOnly,
+    );
+
+    try {
+      final result = await _graphQLClient.query(options);
+
+      if (result.hasException) {
+        throw result.exception!;
+      }
+      
+      if (result.data == null || result.data!['getTransactionByHash'] == null) {
+        developer.log('[INFO] Tx not found in GraphQL: $txHash', name: _serviceName);
+        return null;
+      }
+      
+      return Transaction.fromJson(result.data!['getTransactionByHash']);
+    } catch (e, s) {
+       developer.log(
+        '[ERROR] Error fetching transaction by hash from GraphQL',
+        name: _serviceName,
+        error: e,
+        stackTrace: s,
+      );
+      return null;
+    }
+  }
+
+
+  // --- Fungsi di bawah ini tetap menggunakan Web3Client untuk interaksi langsung ke blockchain ---
+
+  Future<TransactionReceipt?> getTransactionReceipt(String txHash) async {
+    try {
+      return await _client.getTransactionReceipt(txHash);
+    } catch (e, s) {
+      developer.log(
+        '[ERROR] Receipt fetch error',
+        name: _serviceName,
+        error: e,
+        stackTrace: s,
+      );
+      rethrow;
+    }
+  }
+
+  Future<TransactionReceipt> waitForTransactionReceipt(String txHash) async {
+    developer.log('[INFO] Waiting for receipt: $txHash', name: _serviceName);
     const pollInterval = Duration(seconds: 2);
-    const timeout = Duration(minutes: 1); // Timeout setelah 1 menit
+    const timeout = Duration(minutes: 1);
     final completer = Completer<TransactionReceipt>();
 
-    // Polling secara periodik untuk memeriksa status transaksi
-    Timer.periodic(pollInterval, (timer) async {
+    final timer = Timer.periodic(pollInterval, (timer) async {
       if (completer.isCompleted) {
         timer.cancel();
         return;
       }
-      final receipt = await getTransactionReceipt(txHash);
-      if (receipt != null) {
-        developer.log(
-          '[INFO] Receipt found for tx: $txHash',
-          name: _serviceName,
-        );
-        timer.cancel();
-        completer.complete(receipt);
-      }
+      try {
+        final receipt = await getTransactionReceipt(txHash);
+        if (receipt != null) {
+          timer.cancel();
+          if (!completer.isCompleted) completer.complete(receipt);
+        }
+      } catch (_) {}
     });
 
     return completer.future.timeout(
       timeout,
       onTimeout: () {
-        if (!completer.isCompleted) {
-          throw TimeoutException(
-            'Transaction receipt lookup timed out for hash $txHash',
-          );
-        }
-        return completer.future;
+        timer.cancel();
+        throw TimeoutException('Timeout waiting for receipt $txHash');
       },
     );
   }
 
-  /// Mendapatkan nonce (jumlah transaksi yang telah dikirim) dari sebuah alamat.
-  /// Penting untuk menandatangani transaksi baru.
   Future<int> getNonce(String addressHex) async {
-    developer.log('[INFO] Fetching nonce for: $addressHex', name: _serviceName);
-    try {
-      final address = EthereumAddress.fromHex(addressHex);
-      return await _client.getTransactionCount(address);
-    } catch (e, s) {
-      developer.log(
-        '[ERROR] Error fetching nonce',
-        name: _serviceName,
-        error: e,
-        stackTrace: s,
-      );
-      rethrow;
-    }
+    final address = EthereumAddress.fromHex(addressHex);
+    return await _client.getTransactionCount(address);
   }
 
-  /// Mengambil informasi detail sebuah transaksi dari blockchain berdasarkan hash-nya.
-  Future<TransactionInformation?> getTransactionByHash(String txHash) async {
-    developer.log(
-      '[INFO] Fetching transaction info for: $txHash',
-      name: _serviceName,
-    );
-    try {
-      return await _client.getTransactionByHash(txHash);
-    } catch (e, s) {
-      developer.log(
-        '[ERROR] Error fetching transaction info',
-        name: _serviceName,
-        error: e,
-        stackTrace: s,
-      );
-      rethrow;
-    }
-  }
-
-  /// Memperkirakan total biaya (gas fee) dalam Wei untuk sebuah transaksi.
-  /// Ini adalah hasil dari `gasPrice * estimatedGas`.
   Future<BigInt> estimateTransactionFee({
     required EthereumAddress to,
     EtherAmount? value,
-    // Tambahkan parameter lain jika diperlukan, seperti `data` untuk interaksi kontrak
   }) async {
-    developer.log('[INFO] Estimating fee to: ${to.hex}', name: _serviceName);
-    try {
-      final gasPrice = await _client.getGasPrice();
-      final estimatedGasLimit = await _client.estimateGas(to: to, value: value);
-      final totalFee = gasPrice.getInWei * estimatedGasLimit;
-      developer.log('[INFO] Estimated fee: $totalFee Wei', name: _serviceName);
-      return totalFee;
-    } catch (e, s) {
-      developer.log(
-        '[ERROR] Error estimating fee',
-        name: _serviceName,
-        error: e,
-        stackTrace: s,
-      );
-      rethrow;
-    }
+    final gasPrice = await _client.getGasPrice();
+    final estimatedGas = BigInt.from(21000); // Standard transfer
+    return gasPrice.getInWei * estimatedGas;
   }
 }

@@ -7,6 +7,7 @@ import 'package:qrypta/src/core/config/theme/app_colors.dart';
 import 'package:qrypta/src/features/home/presentation/widgets/action_buttons.dart';
 import 'package:qrypta/src/features/home/presentation/widgets/home_body_widgets.dart';
 import 'package:qrypta/src/features/profile/presentation/screens/profile_screen.dart';
+import 'package:qrypta/src/features/transaction/presentation/screens/transaction_history_screen.dart'; // Import TransactionHistoryScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,14 +20,25 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0; // Untuk melacak item aktif di bottom nav
 
   void _onItemTapped(int index) {
-    if (index == 2) { // Index 2 adalah untuk QR Code Scanner
+    if (index == 1) { // Index 1 adalah untuk History
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const TransactionHistoryScreen()),
+      );
+    } else if (index == 2) { // Index 2 adalah untuk QR Code Scanner
       _onQrButtonPressed();
+    } else if (index == 3) { // Index 3 adalah untuk Discover (Search)
+      print('Tombol Discover ditekan');
+      // TODO: Implement navigation to Discover/Search screen
+      setState(() {
+        _selectedIndex = index;
+      });
     } else if (index == 4) { // Index 4 adalah untuk Profile
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const ProfileScreen()),
       );
-    } else {
+    } else { // Index 0 adalah untuk Home
       setState(() {
         _selectedIndex = index;
       });

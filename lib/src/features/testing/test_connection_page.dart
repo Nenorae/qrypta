@@ -1,15 +1,16 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import for Riverpod
 import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
 
-class TestConnectionPage extends StatefulWidget {
+class TestConnectionPage extends ConsumerStatefulWidget { // Changed to ConsumerStatefulWidget
   const TestConnectionPage({super.key});
 
   @override
-  State<TestConnectionPage> createState() => _TestConnectionPageState();
+  ConsumerState<TestConnectionPage> createState() => _TestConnectionPageState();
 }
 
-class _TestConnectionPageState extends State<TestConnectionPage> {
+class _TestConnectionPageState extends ConsumerState<TestConnectionPage> {
   String _connectionStatus = 'Menunggu tes koneksi...';
   bool _isLoading = false;
 
@@ -19,13 +20,20 @@ class _TestConnectionPageState extends State<TestConnectionPage> {
       _connectionStatus = 'Menghubungkan ke blockchain...';
     });
 
-    final blockchainService = BlockchainService();
-    final result = await blockchainService.BlockchainService();
+    try {
+      final blockchainService = ref.read(blockchainServiceProvider);
+      await blockchainService.client.getBlockNumber();
 
-    setState(() {
-      _connectionStatus = result;
-      _isLoading = false;
-    });
+      setState(() {
+        _connectionStatus = 'Koneksi ke blockchain berhasil!';
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _connectionStatus = 'Koneksi gagal: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override

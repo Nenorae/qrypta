@@ -1,31 +1,25 @@
-class Token {
-  final String contractAddress;
-  final String name;
+class TokenModel {
   final String symbol;
+  final String name;
   final int decimals;
-  BigInt? balance; // Saldo bisa null sampai berhasil di-fetch
+  final BigInt balance; // Use BigInt for precision
+  final String? logoUrl;
 
-  Token({
-    required this.contractAddress,
-    required this.name,
+  TokenModel({
     required this.symbol,
+    required this.name,
     required this.decimals,
-    this.balance,
+    required this.balance,
+    this.logoUrl,
   });
 
-  Token copyWith({
-    String? contractAddress,
-    String? name,
-    String? symbol,
-    int? decimals,
-    BigInt? balance,
-  }) {
-    return Token(
-      contractAddress: contractAddress ?? this.contractAddress,
-      name: name ?? this.name,
-      symbol: symbol ?? this.symbol,
-      decimals: decimals ?? this.decimals,
-      balance: balance ?? this.balance,
+  factory TokenModel.fromJson(Map<String, dynamic> json) {
+    return TokenModel(
+      symbol: json['symbol'] as String,
+      name: json['name'] as String,
+      decimals: json['decimals'] as int,
+      balance: BigInt.parse(json['balance'] as String), // Parse balance as BigInt
+      logoUrl: json['logoUrl'] as String?,
     );
   }
 }

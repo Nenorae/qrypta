@@ -7,12 +7,14 @@ class ConfirmationPage extends StatefulWidget {
   final String recipientAddress;
   final EtherAmount amount;
   final EtherAmount estimatedFee;
+  final String? transactionHash; // New optional parameter
 
   const ConfirmationPage({
     super.key,
     required this.recipientAddress,
     required this.amount,
     required this.estimatedFee,
+    this.transactionHash, // Add to constructor
   });
 
   @override
@@ -149,9 +151,11 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
   @override
   Widget build(BuildContext context) {
     developer.log('Building ConfirmationPage', name: 'ConfirmationPage');
+    final bool isTransactionSent = widget.transactionHash != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Confirm Transaction'),
+        title: Text(isTransactionSent ? 'Transaction Sent' : 'Confirm Transaction'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -174,20 +178,33 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
                     _buildSummaryRow('Amount:', '${widget.amount.getValueInUnit(EtherUnit.ether)} ETH'),
                     const SizedBox(height: 8),
                     _buildSummaryRow('Estimated Fee:', '${widget.estimatedFee.getValueInUnit(EtherUnit.ether)} ETH'),
+                    if (isTransactionSent) ...[
+                      const SizedBox(height: 8),
+                      _buildSummaryRow('Tx Hash:', widget.transactionHash!),
+                    ],
                   ],
                 ),
               ),
             ),
             const Spacer(),
-            ElevatedButton(
-              onPressed: _isSending ? null : _sendTransaction,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+            if (isTransactionSent)
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text('Done'),
+              )
+            else
+              ElevatedButton(
+                onPressed: _isSending ? null : _sendTransaction,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: _isSending
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Confirm and Send'),
               ),
-              child: _isSending
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Confirm and Send'),
-            ),
             const SizedBox(height: 20),
           ],
         ),

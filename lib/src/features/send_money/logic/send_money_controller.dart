@@ -1,43 +1,77 @@
-
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:web3dart/web3dart.dart'; // Import web3dart for transaction signing
+import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
+import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
+import 'package:qrypta/src/core/config/blockchain_config.dart';
 
 // Enum untuk merepresentasikan level biaya transaksi
 enum FeeLevel { low, medium, high }
 
-class SendMoneyController extends ChangeNotifier {
+// Define the state for SendMoneyController
+class SendMoneyState {
+  final FeeLevel selectedFee;
+  final bool isSending;
+  final String? errorMessage;
+  final String? transactionHash; // New field for transaction hash
+
+  SendMoneyState({
+    this.selectedFee = FeeLevel.medium,
+    this.isSending = false,
+    this.errorMessage,
+    this.transactionHash,
+  });
+
+  SendMoneyState copyWith({
+    FeeLevel? selectedFee,
+    bool? isSending,
+    String? errorMessage,
+    String? transactionHash,
+  }) {
+    return SendMoneyState(
+      selectedFee: selectedFee ?? this.selectedFee,
+      isSending: isSending ?? this.isSending,
+      errorMessage: errorMessage, // Nullable field, so don't use ??
+      transactionHash: transactionHash, // Nullable field
+    );
+  }
+}
+
+// Notifier for SendMoneyController
+class SendMoneyController extends Notifier<SendMoneyState> {
   final TextEditingController addressController = TextEditingController();
   final TextEditingController amountController = TextEditingController();
 
-  FeeLevel _selectedFee = FeeLevel.medium;
-  bool _isSending = false;
-  String? _errorMessage;
-
-  FeeLevel get selectedFee => _selectedFee;
-  bool get isSending => _isSending;
-  String? get errorMessage => _errorMessage;
+  @override
+  SendMoneyState build() {
+    ref.onDispose(() {
+      addressController.dispose();
+      amountController.dispose();
+    });
+    return SendMoneyState();
+  }
 
   // Mengubah level biaya yang dipilih
   void setFeeLevel(FeeLevel fee) {
     developer.log('Setting fee level to: $fee', name: 'SendMoneyController');
-    _selectedFee = fee;
-    notifyListeners();
+    state = state.copyWith(selectedFee: fee);
   }
 
   // Fungsi untuk memvalidasi input
   bool _validateInput() {
     developer.log('Validating input', name: 'SendMoneyController');
     if (addressController.text.isEmpty) {
-      _errorMessage = "Recipient address cannot be empty.";
+      state = state.copyWith(errorMessage: "Recipient address cannot be empty.");
       developer.log('Validation failed: Recipient address is empty', name: 'SendMoneyController');
       return false;
     }
     if (amountController.text.isEmpty || double.tryParse(amountController.text) == null || double.parse(amountController.text) <= 0) {
-      _errorMessage = "Please enter a valid amount.";
+      state = state.copyWith(errorMessage: "Please enter a valid amount.");
       developer.log('Validation failed: Invalid amount', name: 'SendMoneyController');
       return false;
     }
-    _errorMessage = null;
+    state = state.copyWith(errorMessage: null);
     developer.log('Validation successful', name: 'SendMoneyController');
     return true;
   }
@@ -46,39 +80,65 @@ class SendMoneyController extends ChangeNotifier {
   Future<void> sendTransaction() async {
     developer.log('Attempting to send transaction', name: 'SendMoneyController');
     if (!_validateInput()) {
-      notifyListeners();
       return;
     }
 
-    _isSending = true;
-    _errorMessage = null;
-    notifyListeners();
+    state = state.copyWith(isSending: true, errorMessage: null, transactionHash: null);
+
+    final blockchainService = ref.read(blockchainServiceProvider);
+    final getPrivateKey = ref.read(getPrivateKeyUseCaseProvider);
 
     try {
-      // Simulasi proses pengiriman (misalnya, panggilan API)
-      developer.log('Simulating transaction sending...', name: 'SendMoneyController');
-      await Future.delayed(const Duration(seconds: 2));
+      final privateKey = await getPrivateKey();
+      if (privateKey == null) {
+        state = state.copyWith(isSending: false, errorMessage: "Private key not found.");
+        return;
+      }
 
-      // Logika setelah berhasil (bisa diganti dengan navigasi atau notifikasi)
-      developer.log('Transaction successful!', name: 'SendMoneyController');
-      developer.log('Address: ${addressController.text}', name: 'SendMoneyController');
-      developer.log('Amount: ${amountController.text}', name: 'SendMoneyController');
-      developer.log('Fee: $_selectedFee', name: 'SendMoneyController');
+      final credentials = EthPrivateKey.fromHex(privateKey);
+      final recipient = EthereumAddress.fromHex(addressController.text);
+      final amountInEther = double.parse(amountController.text);
+      final value = EtherAmount.fromUnitAndValue(EtherUnit.ether, amountInEther);
+      
+      final currentNonce = await blockchainService.transaction.getNonce(credentials.address.hex);
+      final gasPrice = await blockchainService.client.getGasPrice();
+      final estimatedGas = 21000; // Standard gas limit for simple transfers
+
+      final transaction = Transaction(
+        to: recipient,
+        value: value,
+        gasPrice: gasPrice,
+        maxGas: estimatedGas,
+        nonce: currentNonce,
+      );
+
+      final signedTransaction = await blockchainService.client.signTransaction(
+        credentials,
+        transaction,
+        chainId: BlockchainConfig.chainId,
+      );
+
+      // Convert Uint8List to hex string
+      final signedTransactionHex = '0x${bytesToHex(signedTransaction)}';
+
+      final txHash = await blockchainService.transaction.sendSignedTransaction(signedTransactionHex);
+
+      state = state.copyWith(isSending: false, transactionHash: txHash, errorMessage: null);
+      developer.log('Transaction successful, hash: $txHash', name: 'SendMoneyController');
 
     } catch (e, s) {
-      _errorMessage = "Failed to send transaction. Please try again.";
+      state = state.copyWith(isSending: false, errorMessage: "Failed to send transaction: ${e.toString()}");
       developer.log('Failed to send transaction', name: 'SendMoneyController', error: e, stackTrace: s);
-    } finally {
-      _isSending = false;
-      notifyListeners();
     }
   }
 
-  @override
-  void dispose() {
-    developer.log('Disposing SendMoneyController', name: 'SendMoneyController');
-    addressController.dispose();
-    amountController.dispose();
-    super.dispose();
+  // Helper to convert Uint8List to hex string (web3dart's bytesToHex is internal)
+  String bytesToHex(List<int> bytes) {
+    return bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
   }
 }
+
+// Provider definition
+final sendMoneyControllerProvider = NotifierProvider<SendMoneyController, SendMoneyState>(
+  () => SendMoneyController(),
+);
