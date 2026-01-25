@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 // Pastikan path import ini benar sesuai struktur proyek Anda
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
+import 'package:qrypta/src/features/authentication/presentation/screens/login_screen.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/wallet_setup_seed_phrase_screen.dart';
 
 class WalletSetupScreen extends StatelessWidget {
@@ -78,7 +79,6 @@ class WalletSetupScreen extends StatelessWidget {
                       );
                     } catch (e, stackTrace) {
                       // Blok ini akan menangkap error yang mungkin terjadi
-                      print('🔴 TERJADI ERROR di Tombol Buat Dompet Baru 🔴');
                       log(
                         'Error di onPressed Buat Dompet Baru',
                         name: 'WalletSetupError',
@@ -108,26 +108,19 @@ class WalletSetupScreen extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () {
                     try {
-                      // Log paling atas untuk menandai fungsi dimulai
                       log(
-                        'Memulai onPressed Import Dompet',
+                        'Tombol "SAYA SUDAH PUNYA DOMPET" ditekan. Navigasi ke LoginScreen.',
                         name: 'WalletSetupScreen',
                       );
-                      print('Memulai onPressed Import Dompet');
-
-                      // TODO: Arahkan ke halaman import via seed phrase
-                      // Letakkan logika import Anda di sini
-
-                      // Log di akhir untuk menandai fungsi selesai tanpa error
-                      log(
-                        'Berhasil menjalankan onPressed Import Dompet',
-                        name: 'WalletSetupScreen',
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
                       );
                     } catch (e, stackTrace) {
-                      // Blok ini akan menangkap error yang mungkin terjadi
-                      print('🔴 TERJADI ERROR di Tombol Import Dompet 🔴');
                       log(
-                        'Error di onPressed Import Dompet',
+                        'Error saat navigasi ke LoginScreen',
                         name: 'WalletSetupError',
                         error: e,
                         stackTrace: stackTrace,

@@ -5,6 +5,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
+import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/wallet_provider.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/wallet_setup_pin_screen.dart';
 
@@ -25,22 +26,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _importWallet() {
+  void _importWallet() async {
     if (_formKey.currentState!.validate()) {
       final mnemonic = _mnemonicController.text.trim();
-      log('Importing wallet with mnemonic: $mnemonic', name: 'LoginScreen');
-      
-      // Use the existing provider to "create" (import) the wallet
-      ref.read(walletProvider.notifier).createWallet(mnemonic);
+      log('Attempting to import wallet with mnemonic: $mnemonic', name: 'LoginScreen');
 
-      // Navigate to PIN setup screen
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const WalletSetupPinScreen(),
-        ),
-        (route) => route.isFirst,
-      );
+      // 1. Get the auth service and validate the mnemonic
+      final authService = ref.read(authServiceProvider);
+      final isValid = await authService.isMnemonicValid(mnemonic);
+
+      // Ensure the widget is still mounted before using context
+      if (!mounted) return;
+
+      if (isValid) {
+        log('Mnemonic is valid. Importing wallet...', name: 'LoginScreen');
+        // 2. Use the existing provider to "create" (import) the wallet
+        ref.read(walletProvider.notifier).createWallet(mnemonic);
+
+        // 3. Navigate to PIN setup screen
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const WalletSetupPinScreen(),
+          ),
+          (route) => route.isFirst,
+        );
+      } else {
+        log('Mnemonic is invalid.', name: 'LoginScreen');
+        // 4. Show an error message to the user
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Seed phrase tidak valid. Periksa kembali jumlah kata dan ejaannya.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

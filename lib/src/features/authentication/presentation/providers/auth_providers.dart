@@ -15,6 +15,7 @@ import 'package:qrypta/src/features/authentication/domain/usecases/get_private_k
 import 'package:qrypta/src/features/authentication/domain/usecases/get_public_key_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/verify_pin_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/get_pin_usecase.dart';
+import 'package:qrypta/src/features/authentication/domain/usecases/validate_mnemonic_usecase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Data Layer
@@ -69,6 +70,10 @@ final verifyPinUseCaseProvider = Provider<VerifyPinUseCase>(
   (ref) => VerifyPinUseCase(ref.watch(authRepositoryProvider)),
 );
 
+final validateMnemonicUseCaseProvider = Provider<ValidateMnemonicUseCase>(
+  (ref) => ValidateMnemonicUseCase(ref.watch(authRepositoryProvider)),
+);
+
 // Application Layer
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService(
@@ -81,6 +86,7 @@ final authServiceProvider = Provider<AuthService>((ref) {
     getPublicKeyUseCase: ref.watch(getPublicKeyUseCaseProvider),
     savePinUseCase: ref.watch(savePinUseCaseProvider),
     verifyPinUseCase: ref.watch(verifyPinUseCaseProvider),
+    validateMnemonicUseCase: ref.watch(validateMnemonicUseCaseProvider),
   );
 });
 

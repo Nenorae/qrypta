@@ -16,4 +16,6 @@ abstract class AuthenticationRepository {
   Future<bool> verifyPin(String pin);
 
   Future<String?> getPin();
+
+  Future<bool> isMnemonicValid(String mnemonic);
 }

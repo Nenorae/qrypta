@@ -7,6 +7,7 @@ import 'package:qrypta/src/features/authentication/domain/usecases/get_private_k
 import 'package:qrypta/src/features/authentication/domain/usecases/get_public_key_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/save_pin_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/verify_pin_usecase.dart';
+import 'package:qrypta/src/features/authentication/domain/usecases/validate_mnemonic_usecase.dart';
 
 class AuthService {
   final GenerateMnemonicUseCase generateMnemonicUseCase;
@@ -16,6 +17,7 @@ class AuthService {
   final GetPublicKeyUseCase getPublicKeyUseCase;
   final SavePinUseCase savePinUseCase;
   final VerifyPinUseCase verifyPinUseCase;
+  final ValidateMnemonicUseCase validateMnemonicUseCase;
 
   AuthService({
     required this.generateMnemonicUseCase,
@@ -25,6 +27,7 @@ class AuthService {
     required this.getPublicKeyUseCase,
     required this.savePinUseCase,
     required this.verifyPinUseCase,
+    required this.validateMnemonicUseCase,
   });
 
   Future<String> generateMnemonic() async {
@@ -64,5 +67,12 @@ class AuthService {
 
   Future<bool> verifyPin(String pin) async {
     return await verifyPinUseCase(pin);
+  }
+
+  Future<bool> isMnemonicValid(String mnemonic) async {
+    log('Validating mnemonic...', name: 'AuthService');
+    final isValid = await validateMnemonicUseCase(mnemonic);
+    log('Mnemonic validation result: $isValid', name: 'AuthService');
+    return isValid;
   }
 }

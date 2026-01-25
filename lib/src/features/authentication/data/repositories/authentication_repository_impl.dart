@@ -70,6 +70,22 @@ String _getChecksumAddress(String privateKeyHex) {
   }
 }
 
+bool _isMnemonicValid(String mnemonic) {
+  try {
+    final words = mnemonic.trim().split(' ');
+    const validWordCounts = [12, 15, 18, 21, 24];
+    if (!validWordCounts.contains(words.length)) {
+      return false;
+    }
+    // This will throw an exception if the mnemonic is not valid
+    wallet.mnemonicToSeed(words, passphrase: '');
+    return true;
+  } catch (e) {
+    // For validation, just return false
+    return false;
+  }
+}
+
 class AuthenticationRepositoryImpl implements AuthenticationRepository {
   final AuthenticationLocalDataSource localDataSource;
 
@@ -200,6 +216,11 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
   @override
   Future<String?> getPin() async {
     return await localDataSource.getPin();
+  }
+
+  @override
+  Future<bool> isMnemonicValid(String mnemonic) async {
+    return await compute(_isMnemonicValid, mnemonic);
   }
   
   @override
