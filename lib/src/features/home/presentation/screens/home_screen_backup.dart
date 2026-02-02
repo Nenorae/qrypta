@@ -7,6 +7,7 @@ import 'package:qrypta/src/core/config/theme/app_colors.dart';
 import 'package:qrypta/src/features/home/presentation/widgets/action_buttons.dart';
 import 'package:qrypta/src/features/home/presentation/widgets/home_body_widgets.dart';
 import 'package:qrypta/src/features/profile/presentation/screens/profile_screen.dart';
+import 'package:qrypta/src/features/tokens/presentation/screens/manage_tokens_screen.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/transaction_history_screen.dart'; // Import TransactionHistoryScreen
 
 class HomeScreen extends StatefulWidget {
@@ -28,11 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (index == 2) { // Index 2 adalah untuk QR Code Scanner
       _onQrButtonPressed();
     } else if (index == 3) { // Index 3 adalah untuk Discover (Search)
-      print('Tombol Discover ditekan');
-      // TODO: Implement navigation to Discover/Search screen
-      setState(() {
-        _selectedIndex = index;
-      });
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ManageTokensScreen()),
+      );
     } else if (index == 4) { // Index 4 adalah untuk Profile
       Navigator.push(
         context,

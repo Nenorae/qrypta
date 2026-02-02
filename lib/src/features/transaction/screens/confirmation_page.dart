@@ -1,9 +1,10 @@
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
-import 'package:qrypta/src/features/blockchain/services/blockchain_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
 import 'package:web3dart/web3dart.dart';
 
-class ConfirmationPage extends StatefulWidget {
+class ConfirmationPage extends ConsumerStatefulWidget {
   final String recipientAddress;
   final EtherAmount amount;
   final EtherAmount estimatedFee;
@@ -18,10 +19,10 @@ class ConfirmationPage extends StatefulWidget {
   });
 
   @override
-  State<ConfirmationPage> createState() => _ConfirmationPageState();
+  ConsumerState<ConfirmationPage> createState() => _ConfirmationPageState();
 }
 
-class _ConfirmationPageState extends State<ConfirmationPage> {
+class _ConfirmationPageState extends ConsumerState<ConfirmationPage> {
   bool _isSending = false;
 
   Future<String?> _getPrivateKey() async {
@@ -114,17 +115,17 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
       _isSending = true;
     });
 
-    final blockchainService = BlockchainService();
+    final blockchainService = ref.read(blockchainServiceProvider);
     try {
       final recipient = EthereumAddress.fromHex(widget.recipientAddress);
       developer.log('Sending transaction to ${widget.recipientAddress}', name: 'ConfirmationPage');
-      final txHash = await blockchainService.sendTransaction(privateKey, recipient, widget.amount);
+      final txHash = await blockchainService.nativeCurrency.sendTransaction(privateKey, recipient, widget.amount);
       developer.log('Transaction sent, hash: $txHash', name: 'ConfirmationPage');
 
       _showSuccessDialog(txHash, false); // Show sent status immediately
 
       developer.log('Waiting for transaction receipt for tx: $txHash', name: 'ConfirmationPage');
-      final receipt = await blockchainService.waitForTransactionReceipt(txHash);
+      final receipt = await blockchainService.transaction.waitForTransactionReceipt(txHash);
       developer.log('Transaction receipt received for tx: $txHash, status: ${receipt.status}', name: 'ConfirmationPage');
 
       if (mounted) {
@@ -143,7 +144,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
           _isSending = false;
         });
       }
-      await blockchainService.dispose();
+      // No need to dispose the service, Riverpod handles it.
       developer.log('Transaction process finished', name: 'ConfirmationPage');
     }
   }

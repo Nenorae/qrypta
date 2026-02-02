@@ -1,6 +1,6 @@
 const String getMyWalletQuery = r'''
 query GetMyWallet($address: String!) {
-  wallet(address: $address) {
+  tokenAsset(address: $address) {
     tokens {
       symbol
       name
