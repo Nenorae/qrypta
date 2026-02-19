@@ -1,13 +1,28 @@
-const String getMyWalletQuery = r'''
-query GetMyWallet($address: String!) {
-  tokenAsset(address: $address) {
-    tokens {
-      symbol
+const String getMyAssetsQuery = r'''
+query MyAssets($walletAddress: String!) {
+  myAssets(walletAddress: $walletAddress) {
+    token {
+      address
       name
+      symbol
       decimals
-      balance
       logoUrl
+      tokenType
     }
+    balance
+  }
+}
+''';
+
+const String getDiscoverTokensQuery = r'''
+query DiscoverTokens($limit: Int!, $offset: Int!) {
+  discoverTokens(limit: $limit, offset: $offset) {
+    address
+    name
+    symbol
+    decimals
+    logoUrl
+    tokenType
   }
 }
 ''';

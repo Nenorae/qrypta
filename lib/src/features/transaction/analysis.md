@@ -1,28 +1,38 @@
-# Analisis Layanan Fitur Transaksi
+# Analisis Fitur Transaksi (Unified Architecture)
 
-Dokumen ini menganalisis bagaimana fitur transaksi berinteraksi dengan sumber data eksternal. Terdapat pemisahan yang jelas antara pengambilan data historis dan pengiriman transaksi baru.
+Dokumen ini menganalisis arsitektur fitur transaksi yang telah digabungkan (merger), mencakup pengelolaan wallet, penandatanganan transaksi, dan pelaporan status.
 
-## 1. Layanan Menuju Server (Indexer/Blockscan)
+## 1. Arsitektur Terpusat
+Fitur `transaction` kini menjadi satu-satunya pusat kendali untuk semua aktivitas pemindahan aset (ETH dan Token). Fitur `send_money` telah dihapus dan digabungkan ke dalam modul ini untuk memastikan konsistensi keamanan dan kode.
 
-Aktivitas ini berfokus pada pengambilan data riwayat transaksi yang telah diindeks oleh server untuk efisiensi.
+## 2. Komponen Utama
 
--   **File:** `lib/src/features/transaction/data/repositories/transaction_repository_impl.dart`
-    -   **Mekanisme:** File ini adalah inti dari pengambilan riwayat. Ia memanggil `_blockchainService.transaction.getRecentTransactions`. Metode ini diasumsikan menghubungi sebuah API server (seperti Blockscout/Etherscan) untuk mendapatkan daftar transaksi yang sudah jadi, bukan memindai blok satu per satu dari node blockchain.
+### A. Logic: `SendController`
+- **Tanggung Jawab**: Eksekutor tunggal transaksi.
+- **Kemampuan**: Mendukung pengiriman mata uang Native (ETH) dan Token ERC20 (IDRT).
+- **Mekanisme**:
+  1. Validasi input (alamat & jumlah).
+  2. Pengambilan Private Key dari secure storage.
+  3. Penandatanganan transaksi secara offline (Offline Signing).
+  4. Penyiaran ke jaringan blockchain melalui RPC.
 
--   **File:** `lib/src/features/transaction/presentation/providers/transaction_providers.dart`
-    -   **Mekanisme:** Provider `transactionHistoryProvider` menggunakan repository di atas untuk menyediakan data riwayat transaksi ke lapisan UI secara reaktif.
+### B. Presentation: `SendScreen`
+- **Tanggung Jawab**: Antarmuka pengguna (UI) tunggal untuk semua jenis pengiriman.
+- **Fitur**: Mendukung input manual dan pemindaian alamat melalui QR Code.
+- **Reusability**: Menggunakan parameter `TokenModel? token` untuk menentukan apakah transaksi bersifat native atau token.
 
--   **File:** `lib/src/features/transaction/presentation/screens/transaction_history_screen.dart`
-    -   **Mekanisme:** Widget ini hanya menampilkan data yang disediakan oleh `transactionHistoryProvider`, memisahkan sepenuhnya logika UI dari pengambilan data.
+### C. Presentation: `ConfirmationPage` (Reporter)
+- **Tanggung Jawab**: Pelapor status transaksi (Passive Mode).
+- **Mekanisme**: Menerima `transactionHash`, lalu melakukan polling melalui `waitForTransactionReceipt` untuk mendapatkan konfirmasi dari blockchain.
+- **Visual**: Menampilkan detail transaksi (To, Amount, Fee, Hash) dan status akhir (Success/Failed).
 
-## 2. Layanan Menggunakan RPC Blockchain Langsung
+## 3. Aliran Data (Workflow)
+1. **Initiate**: `SendScreen` (ETH) atau `ManageTokensScreen` (Token) memicu navigasi ke `SendScreen`.
+2. **Execute**: User input data -> `SendController` melakukan *Signing* dan *Broadcast*.
+3. **Report**: Setelah mendapat hash, navigasi otomatis ke `ConfirmationPage`.
+4. **Finalize**: `ConfirmationPage` menampilkan resi setelah transaksi terverifikasi di blockchain.
 
-Aktivitas ini melibatkan interaksi langsung dengan node blockchain, yang diperlukan untuk mengirim transaksi baru dan mengelola kunci.
-
--   **File:** `lib/src/features/transaction/screens/confirmation_page.dart`
-    -   **Mekanisme:** Ini adalah titik utama di mana interaksi RPC terjadi.
-        1.  **Pengiriman Transaksi:** Memanggil `blockchainService.sendTransaction(...)`. Secara internal, metode ini bertanggung jawab untuk menandatangani transaksi menggunakan *private key* dan mengirimkannya ke node blockchain melalui **panggilan RPC `eth_sendRawTransaction`**.
-        2.  **Pengecekan Status:** Memanggil `blockchainService.waitForTransactionReceipt(txHash)` yang secara periodik melakukan **panggilan RPC `eth_getTransactionReceipt`** untuk memeriksa apakah transaksi telah dikonfirmasi oleh jaringan.
-
--   **File:** `lib//src/features/transaction/logic/transaction_controller.dart`
-    -   **Mekanisme:** Meskipun tidak secara langsung melakukan panggilan RPC, *controller* ini melakukan operasi kriptografi fundamental di sisi klien. Ia mengelola *private key* dan menggunakan `web3dart` untuk mempersiapkan kredensial (`EthPrivateKey`) yang akan digunakan untuk menandatangani transaksi sebelum dikirim melalui RPC di `ConfirmationPage`.
+## 4. Keuntungan Struktur Baru
+- **Single Point of Truth**: Tidak ada duplikasi logika penandatanganan transaksi.
+- **Easier Maintenance**: Perubahan pada logika pengiriman hanya perlu dilakukan di satu file (`send_controller.dart`).
+- **Clean UI**: Antarmuka pengiriman konsisten untuk semua aset.

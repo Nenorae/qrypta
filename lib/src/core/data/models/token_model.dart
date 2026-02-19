@@ -1,4 +1,5 @@
 class TokenModel {
+  final String contractAddress; // Address of the token contract
   final String symbol;
   final String name;
   final int decimals;
@@ -6,6 +7,7 @@ class TokenModel {
   final String? logoUrl;
 
   TokenModel({
+    required this.contractAddress,
     required this.symbol,
     required this.name,
     required this.decimals,
@@ -15,6 +17,7 @@ class TokenModel {
 
   factory TokenModel.fromJson(Map<String, dynamic> json) {
     return TokenModel(
+      contractAddress: json['address'] as String, // Assuming 'address' is the field from GraphQL
       symbol: json['symbol'] as String,
       name: json['name'] as String,
       decimals: json['decimals'] as int,

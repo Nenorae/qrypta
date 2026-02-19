@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // --- IMPORTS FILE KAMU ---
 import 'package:qrypta/src/core/config/theme/app_theme.dart';
@@ -17,6 +18,9 @@ import 'package:qrypta/src/core/graphql/graphql_provider.dart'
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize dotenv
+  await dotenv.load(fileName: ".env");
 
   // Initialize Hive and open the default box for graphql_flutter.
   await Hive.initFlutter();

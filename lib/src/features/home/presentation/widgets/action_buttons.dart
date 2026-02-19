@@ -1,7 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
-import 'package:qrypta/src/features/send_money/presentation/screens/send_money_screen.dart';
+import 'package:qrypta/src/features/transaction/presentation/screens/send_screen.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/receive_screen.dart';
 
 class ActionButtons extends StatelessWidget {
@@ -40,7 +40,7 @@ class ActionButtons extends StatelessWidget {
             Navigator.pop(context); // Close the modal first
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const SendMoneyScreen()),
+              MaterialPageRoute(builder: (context) => const SendScreen()),
             );
           },
         ),
