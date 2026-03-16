@@ -1,47 +1,49 @@
-// lib/src/features/home/presentation/screens/home_screen.dart
-
-
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
+import 'package:qrypta/src/features/home/logic/home_controller.dart';
 import 'package:qrypta/src/features/home/presentation/widgets/action_buttons.dart';
 import 'package:qrypta/src/features/home/presentation/widgets/home_body_widgets.dart';
+import 'package:qrypta/src/features/home/presentation/providers/home_providers.dart';
+import 'package:qrypta/src/features/tokens/presentation/providers/token_provider.dart';
 import 'package:qrypta/src/features/profile/presentation/screens/profile_screen.dart';
 import 'package:qrypta/src/features/tokens/presentation/screens/manage_tokens_screen.dart';
-import 'package:qrypta/src/features/transaction/presentation/screens/transaction_history_screen.dart'; // Import TransactionHistoryScreen
+import 'package:qrypta/src/features/transaction/presentation/screens/transaction_history_screen.dart';
 
-class HomeScreen extends StatefulWidget {
+final homeControllerProvider =
+    ChangeNotifierProvider((ref) => HomeController());
+
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0; // Untuk melacak item aktif di bottom nav
-
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _onItemTapped(int index) {
-    if (index == 1) { // Index 1 adalah untuk History
+    final controller = ref.read(homeControllerProvider);
+    if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const TransactionHistoryScreen()),
+        MaterialPageRoute(
+            builder: (context) => const TransactionHistoryScreen()),
       );
-    } else if (index == 2) { // Index 2 adalah untuk QR Code Scanner
+    } else if (index == 2) {
       _onQrButtonPressed();
-    } else if (index == 3) { // Index 3 adalah untuk Discover (Search)
+    } else if (index == 3) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const ManageTokensScreen()),
       );
-    } else if (index == 4) { // Index 4 adalah untuk Profile
+    } else if (index == 4) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const ProfileScreen()),
       );
-    } else { // Index 0 adalah untuk Home
-      setState(() {
-        _selectedIndex = index;
-      });
+    } else {
+      controller.setSelectedIndex(index);
     }
   }
 
@@ -60,12 +62,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedIndex = ref.watch(homeControllerProvider).selectedIndex;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
       body: _buildBody(),
-      bottomNavigationBar: _buildBottomNavBar(),
-      extendBody: true, // Membuat body bisa berada di belakang bottom nav bar
+      bottomNavigationBar: _buildBottomNavBar(selectedIndex),
+      extendBody: true,
     );
   }
 
@@ -108,45 +112,47 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBody() {
-    return Stack(
-      children: [
-        // Konten utama yang bisa di-scroll
-        ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0).copyWith(
-            top: 8,
-            bottom: 120, // Padding agar tidak tertutup nav bar & fade
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(totalBalanceProvider);
+        await ref.read(tokenNotifierProvider.notifier).fetchUserTokens();
+      },
+      child: Stack(
+        children: [
+          ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0)
+                .copyWith(top: 8, bottom: 120),
+            children: const [
+              BalanceSection(),
+              SizedBox(height: 24),
+              AssetList(),
+            ],
           ),
-          children: const [
-            BalanceSection(),
-            SizedBox(height: 24),
-            AssetList(),
-          ],
-        ),
-        // Efek Fading di bagian bawah
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            height: 150,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.background.withOpacity(0),
-                  AppColors.background,
-                ],
-                stops: const [0.0, 0.9],
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 150,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.background.withOpacity(0),
+                    AppColors.background,
+                  ],
+                  stops: const [0.0, 0.9],
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildBottomNavBar() {
+  Widget _buildBottomNavBar(int selectedIndex) {
     return Container(
       margin: const EdgeInsets.all(20),
       child: ClipRRect(
@@ -154,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: BottomNavigationBar(
-            currentIndex: _selectedIndex,
+            currentIndex: selectedIndex,
             onTap: _onItemTapped,
             backgroundColor: Colors.white.withOpacity(0.15),
             type: BottomNavigationBarType.fixed,
@@ -165,10 +171,14 @@ class _HomeScreenState extends State<HomeScreen> {
             elevation: 0,
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-              BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
-              BottomNavigationBarItem(icon: Icon(Icons.qr_code_scanner), label: 'Scan'),
-              BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Discover'),
-              BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profile'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.history), label: 'History'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.qr_code_scanner), label: 'Scan'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.search), label: 'Discover'),
+              BottomNavigationBarItem(
+                  icon: Icon(Icons.person_outline), label: 'Profile'),
             ],
           ),
         ),

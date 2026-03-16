@@ -1,37 +1,45 @@
-
-// lib/src/features/home/presentation/widgets/home_body_widgets.dart
-
 import 'dart:math';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
 import 'package:qrypta/src/core/data/models/token_model.dart';
-import 'package:qrypta/src/features/tokens/presentation/providers/token_provider.dart';
+import 'package:qrypta/src/features/home/presentation/providers/home_providers.dart';
 
 // WIDGET 1: Bagian Saldo
-class BalanceSection extends StatelessWidget {
+class BalanceSection extends ConsumerWidget {
   const BalanceSection({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        Text(
-          'RP. 253.456.782,21',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 36,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          '~ 0.145406 BTC',
-          style: TextStyle(color: Colors.white70, fontSize: 16),
-        ),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final totalBalanceAsync = ref.watch(totalBalanceProvider);
+    final NumberFormat currencyFormatter =
+        NumberFormat.currency(locale: 'id_ID', symbol: 'Rp. ', decimalDigits: 2);
+
+    return totalBalanceAsync.when(
+      data: (balance) {
+        return Column(
+          children: [
+            Text(
+              currencyFormatter.format(balance.totalValueInIdr),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Total Balance (GLD/IDRT)',
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('Error: $err')),
     );
   }
 }
@@ -42,7 +50,7 @@ class AssetList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tokensAsync = ref.watch(tokenNotifierProvider);
+    final totalBalanceAsync = ref.watch(totalBalanceProvider);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -50,13 +58,24 @@ class AssetList extends ConsumerWidget {
         color: AppColors.primary.withOpacity(0.4),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: tokensAsync.when(
-        data: (tokens) {
-          if (tokens.isEmpty) {
-            return const Center(child: Text('No assets found.'));
-          }
+      child: totalBalanceAsync.when(
+        data: (balance) {
+          final List<TokenModel> allAssets = [
+            // Add Native ETH explicitly at the top
+            TokenModel(
+              contractAddress: 'native',
+              symbol: 'ETH',
+              name: 'Ethereum (Gas Fee Asset)',
+              decimals: 18,
+              balance: balance.nativeBalance.getInWei,
+              logoUrl:
+                  'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
+            ),
+            ...balance.tokenBalances,
+          ];
+
           return Column(
-            children: tokens.map((token) {
+            children: allAssets.map((token) {
               return _AssetListItem(
                 token: token,
                 onTap: () => print('${token.name} ditekan'),
@@ -72,7 +91,6 @@ class AssetList extends ConsumerWidget {
     );
   }
 }
-
 
 // --- WIDGET HELPER (Private) ---
 
@@ -90,7 +108,7 @@ class _AssetListItem extends StatelessWidget {
     if (balance == BigInt.zero) {
       return '0';
     }
-    final balanceDouble = balance / BigInt.from(pow(10, decimals));
+    final balanceDouble = balance.toDouble() / pow(10, decimals);
     return balanceDouble.toStringAsFixed(4); // Tampilkan 4 angka desimal
   }
 
@@ -107,8 +125,10 @@ class _AssetListItem extends StatelessWidget {
               height: 40,
               child: CachedNetworkImage(
                 imageUrl: token.logoUrl ?? '', // Use empty string for null to avoid errors
-                placeholder: (context, url) => Center(child: Text(token.symbol[0])),
-                errorWidget: (context, url, error) => const Icon(Icons.token), // Placeholder icon
+                placeholder: (context, url) =>
+                    Center(child: Text(token.symbol[0])),
+                errorWidget: (context, url, error) =>
+                    const Icon(Icons.token), // Placeholder icon
               ),
             ),
             const SizedBox(width: 16),
@@ -124,7 +144,8 @@ class _AssetListItem extends StatelessWidget {
                       fontSize: 16,
                     ),
                   ),
-                  Text(_formatBalance(token.balance, token.decimals), style: const TextStyle(color: Colors.white70)),
+                  Text(_formatBalance(token.balance, token.decimals),
+                      style: const TextStyle(color: Colors.white70)),
                 ],
               ),
             ),

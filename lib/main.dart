@@ -10,7 +10,7 @@ import 'package:qrypta/src/core/config/theme/app_theme.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/auth_wrapper.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/pin_verification_screen.dart';
-import 'package:qrypta/src/features/home/presentation/screens/home_screen_backup.dart';
+import 'package:qrypta/src/features/home/presentation/screens/home_screen.dart';
 
 // Import the canonical graphqlClientProvider
 import 'package:qrypta/src/core/graphql/graphql_provider.dart'
