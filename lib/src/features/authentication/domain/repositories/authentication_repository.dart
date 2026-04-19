@@ -5,6 +5,8 @@ abstract class AuthenticationRepository {
 
   Future<String> getPublicKey(String privateKey);
 
+  Future<String> getChecksumAddress(String privateKey);
+
   Future<void> savePrivateKey(String privateKey);
 
   Future<String?> getPrivateKey();

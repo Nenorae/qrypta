@@ -23,13 +23,13 @@ final getRecentTransactionsUseCaseProvider =
 /// Provider that exposes the current user's wallet address (public key).
 final userWalletAddressProvider = FutureProvider<String?>((ref) async {
   final getPrivateKey = ref.watch(getPrivateKeyUseCaseProvider);
-  final getPublicKey = ref.watch(getPublicKeyUseCaseProvider);
+  final getChecksumAddress = ref.watch(getChecksumAddressUseCaseProvider);
 
   final privateKey = await getPrivateKey();
   if (privateKey == null || privateKey.isEmpty) {
     return null;
   }
-  return getPublicKey(privateKey);
+  return getChecksumAddress(privateKey);
 });
 
 // Presentation Layer Provider

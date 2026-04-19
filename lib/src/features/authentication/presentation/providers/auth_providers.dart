@@ -13,6 +13,7 @@ import 'package:qrypta/src/features/authentication/domain/usecases/save_pin_usec
 import 'package:qrypta/src/features/authentication/domain/usecases/save_private_key_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/get_private_key_from_mnemonic_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/get_public_key_usecase.dart';
+import 'package:qrypta/src/features/authentication/domain/usecases/get_checksum_address_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/verify_pin_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/get_pin_usecase.dart';
 import 'package:qrypta/src/features/authentication/domain/usecases/validate_mnemonic_usecase.dart';
@@ -60,6 +61,10 @@ final getPrivateKeyFromMnemonicUseCaseProvider = Provider<
 
 final getPublicKeyUseCaseProvider = Provider<GetPublicKeyUseCase>(
   (ref) => GetPublicKeyUseCase(ref.watch(authRepositoryProvider)),
+);
+
+final getChecksumAddressUseCaseProvider = Provider<GetChecksumAddressUseCase>(
+  (ref) => GetChecksumAddressUseCase(ref.watch(authRepositoryProvider)),
 );
 
 final savePinUseCaseProvider = Provider<SavePinUseCase>(

@@ -1,38 +1,61 @@
 # Analisis Fitur Transaksi (Unified Architecture)
 
-Dokumen ini menganalisis arsitektur fitur transaksi yang telah digabungkan (merger), mencakup pengelolaan wallet, penandatanganan transaksi, dan pelaporan status.
+Dokumen ini merinci arsitektur dan fungsionalitas fitur `transaction` di Qrypta, yang mencakup siklus hidup lengkap aset digital: pengiriman, penerimaan, pemantauan status, dan riwayat transaksi.
 
-## 1. Arsitektur Terpusat
-Fitur `transaction` kini menjadi satu-satunya pusat kendali untuk semua aktivitas pemindahan aset (ETH dan Token). Fitur `send_money` telah dihapus dan digabungkan ke dalam modul ini untuk memastikan konsistensi keamanan dan kode.
+## 1. Arsitektur Terpadu
+Fitur ini mengimplementasikan prinsip *Clean Architecture* dan *Layered Architecture* untuk memastikan skalabilitas dan keamanan tinggi dalam interaksi blockchain.
 
-## 2. Komponen Utama
+### A. Domain Layer (Kebutuhan Bisnis)
+- **`TransactionRepository`**: Kontrak (interface) untuk operasi data transaksi.
+- **`GetRecentTransactionsUseCase`**: Logika bisnis murni untuk mengambil riwayat transaksi pengguna dari blockchain.
 
-### A. Logic: `SendController`
-- **Tanggung Jawab**: Eksekutor tunggal transaksi.
-- **Kemampuan**: Mendukung pengiriman mata uang Native (ETH) dan Token ERC20 (IDRT).
-- **Mekanisme**:
-  1. Validasi input (alamat & jumlah).
-  2. Pengambilan Private Key dari secure storage.
-  3. Penandatanganan transaksi secara offline (Offline Signing).
-  4. Penyiaran ke jaringan blockchain melalui RPC.
+### B. Data Layer (Implementasi Data)
+- **`TransactionRepositoryImpl`**: Implementasi konkrit yang menggunakan `BlockchainService` untuk berkomunikasi dengan jaringan (RPC/Indexer).
 
-### B. Presentation: `SendScreen`
-- **Tanggung Jawab**: Antarmuka pengguna (UI) tunggal untuk semua jenis pengiriman.
-- **Fitur**: Mendukung input manual dan pemindaian alamat melalui QR Code.
-- **Reusability**: Menggunakan parameter `TokenModel? token` untuk menentukan apakah transaksi bersifat native atau token.
+### C. Logic / Controller Layer (State Management)
+- **`SendController` (Riverpod Notifier)**: 
+    - Mengelola state pengiriman (`SendState`).
+    - Melakukan validasi input.
+    - Mengeksekusi *Offline Signing* dan *Broadcasting* untuk ETH maupun Token ERC20 (IDRT).
+- **`TransactionController` (ChangeNotifier)**: 
+    - Mengelola siklus hidup wallet di tingkat fitur (Load, Create, Import).
+    - Menghubungkan logika autentikasi dengan kebutuhan transaksi.
 
-### C. Presentation: `ConfirmationPage` (Reporter)
-- **Tanggung Jawab**: Pelapor status transaksi (Passive Mode).
-- **Mekanisme**: Menerima `transactionHash`, lalu melakukan polling melalui `waitForTransactionReceipt` untuk mendapatkan konfirmasi dari blockchain.
-- **Visual**: Menampilkan detail transaksi (To, Amount, Fee, Hash) dan status akhir (Success/Failed).
+### D. Presentation Layer (Antarmuka Pengguna)
+- **Screens**:
+    - `SendScreen`: UI input pengiriman dengan dukungan pemilihan aset.
+    - `ReceiveScreen`: Menampilkan alamat wallet dalam format teks dan QR Code untuk penerimaan aset.
+    - `TransactionHistoryScreen`: Daftar riwayat transaksi masuk dan keluar.
+    - `ConfirmationPage`: Pemantau status transaksi secara real-time (Polling Receipt).
+    - `SendScannerScreen`: Integrasi kamera untuk pemindaian alamat QR.
+- **Widgets**:
+    - `TransactionListItem`: Komponen visual untuk representasi data transaksi individu (Sent/Received).
 
-## 3. Aliran Data (Workflow)
-1. **Initiate**: `SendScreen` (ETH) atau `ManageTokensScreen` (Token) memicu navigasi ke `SendScreen`.
-2. **Execute**: User input data -> `SendController` melakukan *Signing* dan *Broadcast*.
-3. **Report**: Setelah mendapat hash, navigasi otomatis ke `ConfirmationPage`.
-4. **Finalize**: `ConfirmationPage` menampilkan resi setelah transaksi terverifikasi di blockchain.
+## 2. Alur Kerja Utama (Workflow)
 
-## 4. Keuntungan Struktur Baru
-- **Single Point of Truth**: Tidak ada duplikasi logika penandatanganan transaksi.
-- **Easier Maintenance**: Perubahan pada logika pengiriman hanya perlu dilakukan di satu file (`send_controller.dart`).
-- **Clean UI**: Antarmuka pengiriman konsisten untuk semua aset.
+### I. Proses Pengiriman (Sending)
+1. **Input**: Pengguna memasukkan alamat (manual/QR) dan jumlah di `SendScreen`.
+2. **Execution**: `SendController` mengambil *Private Key*, menandatangani transaksi secara offline, dan mengirimkan hex transaksi ke blockchain.
+3. **Verification**: Navigasi ke `ConfirmationPage` yang melakukan polling hingga transaksi mendapatkan resi (receipt) dari blockchain.
+
+### II. Proses Penerimaan (Receiving)
+1. `ReceiveScreen` mengambil alamat publik wallet pengguna.
+2. Alamat dikonversi menjadi QR Code menggunakan `QrImageView`.
+3. Tersedia fitur *Copy to Clipboard* dan *Share Address*.
+
+### III. Riwayat Transaksi (History)
+1. `transactionHistoryProvider` memicu `GetRecentTransactionsUseCase`.
+2. Data diambil melalui repository dan ditampilkan secara asinkron di `TransactionHistoryScreen`.
+3. UI secara otomatis membedakan transaksi masuk (hijau) dan keluar (merah) berdasarkan alamat pengguna.
+
+## 3. Integrasi Provider & State
+Fitur ini menggunakan Riverpod sebagai orkestrator utama:
+- **`transactionRepositoryProvider`**: Menyediakan akses ke implementasi repository.
+- **`userWalletAddressProvider`**: Provider asinkron untuk mendapatkan alamat wallet pengguna saat ini.
+- **`transactionHistoryProvider`**: Mengelola status loading/error/data untuk riwayat transaksi.
+- **`sendControllerProvider`**: Mengelola state UI selama proses transaksi berlangsung.
+
+## 4. Keamanan & Validasi
+- **Offline Signing**: Kunci privat tidak pernah meninggalkan perangkat; transaksi ditandatangani secara lokal sebelum dikirim ke RPC.
+- **Checksum Address**: Penggunaan alamat Ethereum yang tervalidasi checksum untuk mencegah kesalahan kirim.
+- **Input Validation**: Pemeriksaan format alamat dan kecukupan saldo sebelum proses *signing* dimulai.

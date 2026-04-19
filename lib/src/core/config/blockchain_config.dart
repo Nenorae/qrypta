@@ -3,7 +3,7 @@
 
 class BlockchainConfig {
   // Ganti dengan URL RPC node Besu Anda
-  static const String rpcUrl = "http://127.0.0.1:8545"; // Contoh: localhost
+  static const String rpcUrl = "http://100.92.191.4:8545"; // Contoh: localhost
 
   // Ganti dengan Chain ID jaringan Besu Anda
   // Ini sangat penting untuk transaksi di jaringan privat

@@ -112,11 +112,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildBody() {
-    return RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(totalBalanceProvider);
-        await ref.read(tokenNotifierProvider.notifier).fetchUserTokens();
-      },
+  return RefreshIndicator(
+    onRefresh: () async {
+      ref.invalidate(totalBalanceProvider);
+      await ref.read(tokenNotifierProvider.notifier).fetchUserTokens();
+    },
       child: Stack(
         children: [
           ListView(

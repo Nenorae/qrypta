@@ -144,6 +144,7 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
     }
   }
 
+  @override
   Future<String> getChecksumAddress(String privateKeyHex) async {
     try {
       return await compute(_getChecksumAddress, privateKeyHex);
