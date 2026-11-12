@@ -1,6 +1,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
+import 'package:qrypta/src/features/qr_scanner/presentation/screens/qr_scanner_screen.dart';
+import 'package:qrypta/src/features/transaction/presentation/screens/levy_payment_screen.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/send_screen.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/receive_screen.dart';
 
@@ -14,24 +16,32 @@ class ActionButtons extends StatelessWidget {
       children: [
         _buildListTile(
           context,
-          icon: Icons.swap_horiz,
-          label: 'Swap',
+          icon: Icons.qr_code_scanner_rounded,
+          label: 'Pay with QRIS (ScrPay)',
           onTap: () {
-            Navigator.pop(context); // Close the modal
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const QrScannerScreen()),
+            );
           },
         ),
         _buildListTile(
           context,
-          icon: Icons.payment,
-          label: 'Payment',
+          icon: Icons.receipt_long_rounded,
+          label: 'Tourist Levy (IDR 150,000)',
           onTap: () {
-            Navigator.pop(context); // Close the modal
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const LevyPaymentScreen()),
+            );
           },
         ),
         _buildListTile(
           context,
           icon: Icons.arrow_upward,
-          label: 'Send',
+          label: 'Send Tokens (P2P)',
           onTap: () {
             Navigator.pop(context); // Close the modal first
             Navigator.push(
@@ -43,7 +53,7 @@ class ActionButtons extends StatelessWidget {
         _buildListTile(
           context,
           icon: Icons.arrow_downward,
-          label: 'Receive',
+          label: 'Receive Tokens',
           onTap: () {
             Navigator.pop(context); // Close the modal first
             Navigator.push(

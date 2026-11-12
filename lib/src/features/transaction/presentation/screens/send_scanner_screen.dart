@@ -100,6 +100,133 @@ class _SendScannerScreenState extends State<SendScannerScreen> {
             painter: ScannerOverlayPainter(scanWindow),
             child: Container(),
           ),
+          // Demo QRIS Simulation Floating Controls
+          Positioned(
+            bottom: 24,
+            left: 16,
+            right: 16,
+            child: SafeArea(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.qr_code_2_rounded, size: 14, color: Color(0xFF2DD4BF)),
+                        SizedBox(width: 6),
+                        Text(
+                          'DEMO QRIS SIMULATION SHORTCUT',
+                          style: TextStyle(
+                            color: Color(0xFF2DD4BF),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              controller.stop();
+                              widget.onScanResult(
+                                '{"type":"QRIS","merchantId":"MCH-3311","merchantName":"Bali Coffee House - Canggu","amount":85000,"address":"0x3311A9908F8718E237aDE73708aB59f212284bE0","description":"Specialty Coffee & Pastry"}',
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.3)),
+                              ),
+                              child: Column(
+                                children: const [
+                                  Text(
+                                    'Bali Coffee House',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'IDR 85,000',
+                                    style: TextStyle(
+                                      color: Color(0xFF2DD4BF),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              controller.stop();
+                              widget.onScanResult(
+                                '{"type":"QRIS","merchantId":"MCH-5520","merchantName":"Bali Adventure Tours","amount":350000,"address":"0x5520e5ff38a7c645bcf56b823e590d9a6c9cf141","description":"Mount Batur Sunrise Trek"}',
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.3)),
+                              ),
+                              child: Column(
+                                children: const [
+                                  Text(
+                                    'Bali Adventure',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'IDR 350,000',
+                                    style: TextStyle(
+                                      color: Color(0xFF2DD4BF),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

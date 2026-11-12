@@ -3,7 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
-import 'package:qrypta/src/features/authentication/presentation/screens/wallet_setup_screen.dart';
+import 'package:qrypta/src/features/authentication/presentation/screens/welcome_screen.dart';
 
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});
@@ -18,10 +18,10 @@ class AuthWrapper extends ConsumerWidget {
         // In the new architecture, this widget is only reached if the user
         // does NOT have a wallet. So we always direct to the setup screen.
         log(
-          'AuthWrapper: Navigating to WalletSetupScreen',
+          'AuthWrapper: Navigating to WelcomeScreen (Bali Tourist ID Onboarding)',
           name: 'AuthWrapper',
         );
-        return const WalletSetupScreen();
+        return const WelcomeScreen();
       },
       loading: () {
         log('AuthWrapper: Loading auth state', name: 'AuthWrapper');

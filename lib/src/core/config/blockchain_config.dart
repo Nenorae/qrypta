@@ -21,4 +21,10 @@ class BlockchainConfig {
   /// ezsign-core Fastify middleware API base URL
   static String get ezsignApiUrl =>
       dotenv.isInitialized ? (dotenv.env['EZSIGN_API_URL'] ?? 'http://127.0.0.1:3000/api/v1') : 'http://127.0.0.1:3000/api/v1';
+
+  /// Official Bali Provincial Government (Bapenda) Treasury Address for Tourist Levy
+  static String get bapendaTreasuryAddress =>
+      dotenv.isInitialized
+          ? (dotenv.env['BAPENDA_TREASURY_ADDRESS'] ?? '0x3565E871c841A8cE127B0e05Eb512a865F93845B')
+          : '0x3565E871c841A8cE127B0e05Eb512a865F93845B';
 }

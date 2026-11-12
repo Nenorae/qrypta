@@ -245,7 +245,7 @@ class VerificationTransactionService {
     return auditModel;
   }
 
-  /// Records an on-chain Tourist Levy payment audit entry.
+  /// Records an on-chain Tourist Levy payment audit entry and dispatches to ezsign-core.
   Future<AuditTransactionModel> recordLevyPaymentAudit({
     required String levyRef,
     required String txHash,
@@ -254,6 +254,40 @@ class VerificationTransactionService {
     required String walletAddress,
   }) async {
     final auditRef = _generateAuditRef();
+    final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
+    final middlewareBody = {
+      'uuid': btid,
+      'client_type': 'web3',
+      'signature': '0x',
+      'docType': 'BTID_LEVY_PAYMENT',
+      'metadata': {
+        'actor': 'James Wilson',
+        'org': 'Bali Tourism Authority (Bapenda)',
+        'role': 'Tourist',
+        'action': 'Tourist Levy paid ($amountFormatted)',
+        'purpose': 'Official Bali Tourist Levy Settlement',
+        'record': levyRef,
+        'result': 'Paid',
+        'amount': amountFormatted,
+        'walletAddress': walletAddress,
+        'txHash': txHash,
+        'auditRef': auditRef,
+      },
+      'timestamp': nowEpoch,
+    };
+
+    try {
+      await _httpClient.post(
+        middlewareEndpoint,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(middlewareBody),
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      developer.log('Levy payment audit submit fallback: $e', name: _serviceName);
+    }
+
     final audit = AuditTransactionModel(
       auditRef: auditRef,
       txRef: levyRef,
@@ -264,6 +298,129 @@ class VerificationTransactionService {
       purpose: 'Official Bali Tourist Levy',
       sharedAttributesCount: 0,
       status: 'Paid',
+      timestamp: DateTime.now(),
+    );
+
+    await saveAuditTransaction(audit);
+    return audit;
+  }
+
+  /// Records an on-chain QRIS Merchant Payment audit entry and dispatches to ezsign-core.
+  Future<AuditTransactionModel> recordQrisPaymentAudit({
+    required String payRef,
+    required String txHash,
+    required String merchantName,
+    required String merchantId,
+    required String amountFormatted,
+    required String walletAddress,
+    String? itemDescription,
+  }) async {
+    final auditRef = _generateAuditRef();
+    final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
+    final middlewareBody = {
+      'uuid': walletAddress,
+      'client_type': 'web3',
+      'signature': '0x',
+      'docType': 'BTID_QRIS_PAYMENT',
+      'metadata': {
+        'actor': 'James Wilson',
+        'org': merchantName,
+        'role': 'Customer',
+        'action': 'QRIS Merchant Payment ($amountFormatted)',
+        'purpose': 'Licensed Payment Settlement',
+        'record': payRef,
+        'merchantId': merchantId,
+        'result': 'Paid',
+        'amount': amountFormatted,
+        'itemDescription': itemDescription ?? 'Merchant settlement',
+        'walletAddress': walletAddress,
+        'txHash': txHash,
+        'auditRef': auditRef,
+        'privacyGuarantee': 'Zero personal data or identity revealed to merchant',
+      },
+      'timestamp': nowEpoch,
+    };
+
+    try {
+      await _httpClient.post(
+        middlewareEndpoint,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(middlewareBody),
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      developer.log('QRIS payment audit submit fallback: $e', name: _serviceName);
+    }
+
+    final audit = AuditTransactionModel(
+      auditRef: auditRef,
+      txRef: payRef,
+      txHash: txHash,
+      actor: 'James Wilson',
+      organisation: merchantName,
+      action: 'QRIS Payment ($amountFormatted)',
+      purpose: 'Payment Settlement',
+      sharedAttributesCount: 0,
+      status: 'Paid',
+      timestamp: DateTime.now(),
+    );
+
+    await saveAuditTransaction(audit);
+    return audit;
+  }
+
+  /// Records a credential issuance audit entry (Fase A - ScrIssued) and dispatches to ezsign-core.
+  Future<AuditTransactionModel> recordCredentialIssuedAudit({
+    required String btid,
+    required String fullName,
+    required String walletAddress,
+  }) async {
+    final auditRef = _generateAuditRef();
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final txHash = '0x${bytesToHex(keccak256(utf8.encode("$btid-$walletAddress-$nowIso")))}';
+
+    final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
+    final middlewareBody = {
+      'uuid': btid,
+      'client_type': 'web3',
+      'signature': '0x',
+      'docType': 'BTID_ISSUED',
+      'metadata': {
+        'actor': 'System (Bali Tourism Authority)',
+        'org': 'Bali Tourism Authority & Immigration',
+        'role': 'Issuer',
+        'action': 'Credential issued',
+        'purpose': 'Identity onboarding',
+        'record': btid,
+        'result': 'Issued',
+        'walletAddress': walletAddress,
+        'auditRef': auditRef,
+      },
+      'timestamp': nowEpoch,
+    };
+
+    try {
+      await _httpClient.post(
+        middlewareEndpoint,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(middlewareBody),
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      developer.log('Credential issued audit submit fallback: $e', name: _serviceName);
+    }
+
+    final audit = AuditTransactionModel(
+      auditRef: auditRef,
+      txRef: btid,
+      txHash: txHash,
+      actor: fullName,
+      organisation: 'Bali Tourism Authority & Immigration',
+      action: 'Credential issued',
+      purpose: 'Identity onboarding',
+      sharedAttributesCount: 0,
+      status: 'Approved',
       timestamp: DateTime.now(),
     );
 
