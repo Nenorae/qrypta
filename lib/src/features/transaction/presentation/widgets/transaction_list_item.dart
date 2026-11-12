@@ -22,10 +22,10 @@ class TransactionListItem extends StatelessWidget {
     final toAddress = transaction.toAddress;
 
     // Convert value from String (WEI) to Ether
-    final double valueInEther = web3.EtherAmount.fromUnitAndValue( // Use web3.EtherAmount
-      web3.EtherUnit.wei, // Use web3.EtherUnit
-      BigInt.parse(transaction.value),
-    ).getValueInUnit(web3.EtherUnit.ether); // Use web3.EtherUnit
+    final double valueInEther = web3.EtherAmount.fromBigInt(
+      web3.EtherUnit.wei,
+      BigInt.tryParse(transaction.value) ?? BigInt.zero,
+    ).getValueInUnit(web3.EtherUnit.ether);
 
 
     return Card(

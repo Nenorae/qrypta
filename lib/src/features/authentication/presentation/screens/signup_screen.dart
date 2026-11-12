@@ -66,8 +66,7 @@ class SignUpScreen extends StatelessWidget {
                   height: 50,
                   child: OutlinedButton(
                     onPressed: () {
-                      // TODO: Tambahkan logika untuk sign up
-                      print('Tombol Sign Up ditekan');
+                      // Sign up button pressed
                     },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.font,
@@ -118,9 +117,9 @@ class SignUpScreen extends StatelessWidget {
           style: const TextStyle(color: AppColors.font),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: AppColors.font.withOpacity(0.5)),
+            hintStyle: TextStyle(color: AppColors.font.withValues(alpha: 0.5)),
             filled: true,
-            fillColor: AppColors.primary.withOpacity(0.5),
+            fillColor: AppColors.primary.withValues(alpha: 0.5),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,

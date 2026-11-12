@@ -1,15 +1,14 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 
-// Placeholder GraphQL endpoint. Please update this with your actual GraphQL server URL.
-const String _kGraphQLEndpoint = 'http://100.92.191.4:4000/graphql';
-
 final graphqlClientProvider = Provider<GraphQLClient>((ref) {
-  final HttpLink httpLink = HttpLink(_kGraphQLEndpoint);
+  final endpoint = dotenv.isInitialized
+      ? (dotenv.env['GRAPHQL_URL'] ?? 'http://127.0.0.1:4000/graphql')
+      : 'http://127.0.0.1:4000/graphql';
+  final HttpLink httpLink = HttpLink(endpoint);
 
   // Initialize Hive for caching
-  // Ensure Hive is initialized before this provider is accessed.
-  // e.g., await Hive.initFlutter(); in main()
   final GraphQLCache cache = GraphQLCache(store: HiveStore());
 
   return GraphQLClient(

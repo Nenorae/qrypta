@@ -75,7 +75,7 @@ class ReceiveScreen extends ConsumerWidget {
                         icon: Icons.share,
                         onTap: () {
                           developer.log('Sharing address: $ethAddress', name: 'ReceiveScreen');
-                          Share.share('My Ethereum Address: $ethAddress');
+                          SharePlus.instance.share(ShareParams(text: 'My Ethereum Address: $ethAddress'));
                         },
                       ),
                       const SizedBox(width: 8),
@@ -153,7 +153,7 @@ class ReceiveScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColors.primary.withOpacity(0.5),
+          color: AppColors.primary.withValues(alpha: 0.5),
         ),
         child: Icon(icon, color: AppColors.font, size: 20),
       ),

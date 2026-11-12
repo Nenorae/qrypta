@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:developer';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 abstract class AuthenticationLocalDataSource {
@@ -8,8 +10,8 @@ abstract class AuthenticationLocalDataSource {
   Future<String?> getMnemonic();
   Future<void> saveMnemonic(String mnemonic);
   Future<String?> read({required String key});
-  Future<void> savePin(String pin); // Added method declaration
-  Future<String?> getPin(); // Added method declaration
+  Future<void> savePin(String pin);
+  Future<String?> getPin();
 }
 
 class AuthenticationLocalDataSourceImpl
@@ -20,27 +22,27 @@ class AuthenticationLocalDataSourceImpl
 
   @override
   Future<void> savePrivateKey(String privateKey) async {
-    log('Saving private key: $privateKey', name: 'AuthLocalDataSource');
+    log('Saving private key to secure storage', name: 'AuthLocalDataSource');
     await secureStorage.write(key: 'privateKey', value: privateKey);
   }
 
   @override
   Future<String?> getPrivateKey() async {
     final privateKey = await secureStorage.read(key: 'privateKey');
-    log('Retrieved private key: $privateKey', name: 'AuthLocalDataSource');
+    log('Retrieved private key from secure storage (present: ${privateKey != null})', name: 'AuthLocalDataSource');
     return privateKey;
   }
 
   @override
   Future<void> saveMnemonic(String mnemonic) async {
-    log('Saving mnemonic: "$mnemonic"', name: 'AuthLocalDataSource');
+    log('Saving mnemonic to secure storage', name: 'AuthLocalDataSource');
     await secureStorage.write(key: 'mnemonic', value: mnemonic);
   }
 
   @override
   Future<String?> getMnemonic() async {
     final mnemonic = await secureStorage.read(key: 'mnemonic');
-    log('Retrieved mnemonic: "$mnemonic"', name: 'AuthLocalDataSource');
+    log('Retrieved mnemonic from secure storage (present: ${mnemonic != null})', name: 'AuthLocalDataSource');
     return mnemonic;
   }
 
@@ -51,7 +53,8 @@ class AuthenticationLocalDataSourceImpl
 
   @override
   Future<void> savePin(String pin) async {
-    await secureStorage.write(key: 'pin', value: pin);
+    final hashedPin = sha256.convert(utf8.encode(pin)).toString();
+    await secureStorage.write(key: 'pin', value: hashedPin);
   }
 
   @override

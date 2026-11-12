@@ -55,7 +55,7 @@ class AssetList extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.4),
+        color: AppColors.primary.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(20),
       ),
       child: totalBalanceAsync.when(
@@ -78,7 +78,7 @@ class AssetList extends ConsumerWidget {
             children: allAssets.map((token) {
               return _AssetListItem(
                 token: token,
-                onTap: () => print('${token.name} ditekan'),
+                onTap: () {},
               );
             }).toList(),
           );

@@ -9,7 +9,7 @@ class AppTheme {
     colorScheme: const ColorScheme.dark(
       primary: AppColors.primary,
       secondary: AppColors.accent,
-      surface: AppColors.background,
+      surface: AppColors.surface,
       error: AppColors.error,
       onPrimary: AppColors.font,
       onSecondary: AppColors.font,
@@ -29,7 +29,7 @@ class AppTheme {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.accent,
-        foregroundColor: AppColors.background,
+        foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -42,11 +42,19 @@ class AppTheme {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.primary.withOpacity(0.5),
-      hintStyle: TextStyle(color: AppColors.font.withOpacity(0.5)),
+      fillColor: AppColors.surfaceLight,
+      hintStyle: TextStyle(color: AppColors.fontSecondary.withValues(alpha: 0.6)),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: AppColors.divider),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.divider),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.teal, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(
         horizontal: 16,
@@ -54,11 +62,11 @@ class AppTheme {
       ),
     ),
     chipTheme: ChipThemeData(
-      backgroundColor: AppColors.primary.withOpacity(0.8),
+      backgroundColor: AppColors.primary.withValues(alpha: 0.2),
       labelStyle: const TextStyle(color: AppColors.font),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: const BorderSide(color: AppColors.primary),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
       ),
     ),
   );

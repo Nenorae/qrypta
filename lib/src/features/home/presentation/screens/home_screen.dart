@@ -99,7 +99,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
         IconButton(
-          onPressed: () => print('Tombol Notifikasi ditekan'),
+          onPressed: () {},
           icon: const Icon(
             Icons.notifications,
             color: AppColors.accent,
@@ -139,7 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.background.withOpacity(0),
+                    AppColors.background.withValues(alpha: 0),
                     AppColors.background,
                   ],
                   stops: const [0.0, 0.9],
@@ -162,12 +162,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: BottomNavigationBar(
             currentIndex: selectedIndex,
             onTap: _onItemTapped,
-            backgroundColor: Colors.white.withOpacity(0.15),
+            backgroundColor: Colors.white.withValues(alpha: 0.15),
             type: BottomNavigationBarType.fixed,
             showSelectedLabels: false,
             showUnselectedLabels: false,
             selectedItemColor: AppColors.accent,
-            unselectedItemColor: Colors.white.withOpacity(0.7),
+            unselectedItemColor: Colors.white.withValues(alpha: 0.7),
             elevation: 0,
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),

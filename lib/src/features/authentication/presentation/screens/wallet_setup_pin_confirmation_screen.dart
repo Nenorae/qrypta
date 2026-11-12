@@ -50,9 +50,9 @@ class WalletSetupPinConfirmationScreen extends ConsumerWidget {
                 style: const TextStyle(color: AppColors.font),
                 decoration: InputDecoration(
                   hintText: 'Confirm 6-digit PIN',
-                  hintStyle: TextStyle(color: AppColors.font.withOpacity(0.5)),
+                  hintStyle: TextStyle(color: AppColors.font.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: AppColors.primary.withOpacity(0.5),
+                  fillColor: AppColors.primary.withValues(alpha: 0.5),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,

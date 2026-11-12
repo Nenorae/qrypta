@@ -48,9 +48,9 @@ class WalletSetupPinScreen extends ConsumerWidget {
                 style: const TextStyle(color: AppColors.font),
                 decoration: InputDecoration(
                   hintText: 'Enter 6-digit PIN',
-                  hintStyle: TextStyle(color: AppColors.font.withOpacity(0.5)),
+                  hintStyle: TextStyle(color: AppColors.font.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: AppColors.primary.withOpacity(0.5),
+                  fillColor: AppColors.primary.withValues(alpha: 0.5),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -64,7 +64,7 @@ class WalletSetupPinScreen extends ConsumerWidget {
               const Spacer(),
               ElevatedButton(
                 onPressed: () {
-                  log('Continue button pressed with PIN: ${pinController.text}', name: 'WalletSetupPinScreen');
+                  log('Continue button pressed for PIN confirmation', name: 'WalletSetupPinScreen');
                   Navigator.push(
                     context,
                     MaterialPageRoute(

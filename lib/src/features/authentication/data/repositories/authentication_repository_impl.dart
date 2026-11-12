@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:developer';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:qrypta/src/features/authentication/data/datasources/authentication_local_data_source.dart';
 import 'package:qrypta/src/features/authentication/domain/repositories/authentication_repository.dart';
@@ -12,20 +14,20 @@ import 'package:wallet/wallet.dart' as wallet;
 String _generateMnemonic(String _) {
   // This function now accepts a dummy argument to match the compute signature.
   final mnemonic = wallet.generateMnemonic().join(' ');
-  log('Generated mnemonic: "$mnemonic"', name: 'AuthRepo');
+  log('Generated mnemonic successfully', name: 'AuthRepo');
   return mnemonic;
 }
 
 String _getPrivateKeyFromMnemonic(String mnemonic) {
   try {
-    log('Deriving private key from mnemonic: "$mnemonic"', name: 'AuthRepo');
+    log('Deriving private key from mnemonic isolate', name: 'AuthRepo');
     final mnemonicList = mnemonic.split(' ');
     final seed = wallet.mnemonicToSeed(mnemonicList, passphrase: '');
     final master = wallet.ExtendedPrivateKey.master(seed, wallet.xprv);
     final root = master.forPath("m/44'/60'/0'/0/0");
     final privateKeyBigInt = (root as wallet.ExtendedPrivateKey).key;
     final privateKey = privateKeyBigInt.toRadixString(16).padLeft(64, '0');
-    log('Derived private key: $privateKey', name: 'AuthRepo');
+    log('Derived private key successfully', name: 'AuthRepo');
     return privateKey;
   } catch (e) {
     log('Error deriving private key: $e', name: 'AuthRepo', error: e);
@@ -211,7 +213,9 @@ class AuthenticationRepositoryImpl implements AuthenticationRepository {
   @override
   Future<bool> verifyPin(String pin) async {
     final storedPin = await localDataSource.getPin();
-    return storedPin == pin;
+    if (storedPin == null) return false;
+    final hashedPin = sha256.convert(utf8.encode(pin)).toString();
+    return storedPin == hashedPin || storedPin == pin;
   }
 
   @override

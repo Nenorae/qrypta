@@ -18,8 +18,6 @@ class ActionButtons extends StatelessWidget {
           label: 'Swap',
           onTap: () {
             Navigator.pop(context); // Close the modal
-            print('Tombol SWAP ditekan');
-            // TODO: Implement Swap functionality
           },
         ),
         _buildListTile(
@@ -28,8 +26,6 @@ class ActionButtons extends StatelessWidget {
           label: 'Payment',
           onTap: () {
             Navigator.pop(context); // Close the modal
-            print('Tombol PAYMENT ditekan');
-            // TODO: Implement Payment functionality
           },
         ),
         _buildListTile(

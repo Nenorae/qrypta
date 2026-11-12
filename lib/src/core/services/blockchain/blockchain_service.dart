@@ -13,6 +13,7 @@ import 'wallet_service.dart';
 import 'native_currency_service.dart';
 import 'erc20_service.dart';
 import 'transaction_service.dart';
+import 'verification_transaction_service.dart';
 
 /// Provider tunggal untuk BlockchainService
 final blockchainServiceProvider = Provider<BlockchainService>((ref) {
@@ -40,6 +41,7 @@ class BlockchainService {
   late final NativeCurrencyService nativeCurrency;
   late final Erc20Service erc20;
   late final TransactionService transaction;
+  late final VerificationTransactionService verification;
 
   // Konstruktor diubah untuk menerima dependensi
   BlockchainService(this._client, GraphQLClient graphQLClient) {
@@ -54,6 +56,7 @@ class BlockchainService {
     erc20 = Erc20Service(_client);
     // Sekarang TransactionService menerima kedua client
     transaction = TransactionService(_client, graphQLClient);
+    verification = VerificationTransactionService(_client);
   }
 
   // -- Core Client Getter (jika diperlukan akses langsung) --
@@ -65,6 +68,7 @@ class BlockchainService {
       '[INFO] Disposing BlockchainService gateway client.',
       name: _serviceName,
     );
+    verification.dispose();
     await _client.dispose();
   }
 }

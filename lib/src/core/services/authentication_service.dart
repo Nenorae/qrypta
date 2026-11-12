@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter/services.dart';
 
@@ -16,7 +17,7 @@ class AuthenticationService {
       );
     } on PlatformException catch (e) {
       // Handle exceptions (e.g., user cancels, no hardware)
-      print('Authentication error: $e');
+      developer.log('Authentication error: $e', name: 'AuthenticationService', error: e);
       return false;
     }
   }

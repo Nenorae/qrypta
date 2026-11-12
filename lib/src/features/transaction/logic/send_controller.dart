@@ -5,6 +5,7 @@ import 'package:web3dart/web3dart.dart';
 import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
 import 'package:qrypta/src/core/data/models/token_model.dart';
+import 'package:qrypta/src/core/utils/formatters.dart';
 
 class SendState {
   final bool isSending;
@@ -72,17 +73,21 @@ class SendController extends Notifier<SendState> {
         return;
       }
 
-      final recipient = addressController.text;
-      final amountDouble = double.parse(amountController.text);
+      final recipient = addressController.text.trim();
+      final amountText = amountController.text.trim();
       String txHash;
 
       if (token == null) {
-        // SEND NATIVE ETH
-        final amountInWei = EtherAmount.fromUnitAndValue(EtherUnit.ether, amountDouble);
-        txHash = await blockchainService.nativeCurrency.sendTransaction(privateKey, EthereumAddress.fromHex(recipient), amountInWei);
+        // SEND NATIVE ETH (18 decimals)
+        final amountInWei = parseAmountToBigInt(amountText, 18);
+        txHash = await blockchainService.nativeCurrency.sendTransaction(
+          privateKey,
+          EthereumAddress.fromHex(recipient),
+          EtherAmount.fromBigInt(EtherUnit.wei, amountInWei),
+        );
       } else {
-        // SEND ERC20 TOKEN (IDRT)
-        final amountBigInt = BigInt.from(amountDouble * (BigInt.from(10).pow(token.decimals).toDouble()).toInt());
+        // SEND ERC20 TOKEN (e.g. IDRT with token.decimals precision)
+        final amountBigInt = parseAmountToBigInt(amountText, token.decimals);
         txHash = await blockchainService.erc20.sendErc20Token(
           privateKey: privateKey,
           contractHex: token.contractAddress,

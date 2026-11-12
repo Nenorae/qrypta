@@ -49,6 +49,9 @@ dependencies:
   hive_ce_flutter: ^2.0.0
   shimmer: ^3.0.0
   flutter_dotenv: ^6.0.0
+  google_mlkit_text_recognition: ^1.0.2
+  intl: ^0.20.3
+  wallet: ^0.0.13
 
 dev_dependencies:
   flutter_test:

@@ -5,16 +5,16 @@ import 'package:qrypta/src/features/authentication/presentation/providers/pin_pr
 
 class PinVerificationScreen extends ConsumerStatefulWidget {
   final VoidCallback onVerificationSuccess;
-  final Null Function(dynamic attempts) onVerificationFailed;
-  final String subtitle;
+  final void Function(int attempts)? onVerificationFailed;
   final String title;
+  final String subtitle;
 
   const PinVerificationScreen({
     super.key,
     required this.onVerificationSuccess,
-    required this.onVerificationFailed,
-    required this.subtitle,
-    required this.title,
+    this.onVerificationFailed,
+    this.title = 'Enter PIN',
+    this.subtitle = 'Please enter your 6-digit PIN to continue',
   });
 
   @override
@@ -24,33 +24,16 @@ class PinVerificationScreen extends ConsumerStatefulWidget {
 
 class _PinVerificationScreenState extends ConsumerState<PinVerificationScreen> {
   final pinController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    print(
-      "DEBUG::PIN_SCREEN: initState() called. Layar verifikasi PIN sedang dibuat.",
-    );
-  }
+  int _failedAttempts = 0;
 
   @override
   void dispose() {
-    print(
-      "DEBUG::PIN_SCREEN: dispose() called. Layar verifikasi PIN sedang dihancurkan.",
-    );
     pinController.dispose();
     super.dispose();
   }
 
   Future<void> _verifyPin() async {
-    // --- Cetak log setiap kali fungsi ini dipanggil ---
-    print("DEBUG::PIN_SCREEN: FUNGSI _verifyPin() DIPANGGIL.");
-    print(
-      "                   - PIN yang akan diverifikasi: '${pinController.text}'",
-    );
-
     if (pinController.text.isEmpty) {
-      print("DEBUG::PIN_SCREEN: PIN kosong, verifikasi dibatalkan.");
       return;
     }
 
@@ -58,25 +41,15 @@ class _PinVerificationScreenState extends ConsumerState<PinVerificationScreen> {
         .read(pinProvider.notifier)
         .verifyPin(pinController.text);
 
-    print(
-      "DEBUG::PIN_SCREEN: Hasil verifikasi dari pinProvider adalah: $isPinCorrect",
-    );
-
     if (!mounted) {
-      print(
-        "DEBUG::PIN_SCREEN: Widget sudah tidak ter-mount, pemanggilan callback dibatalkan.",
-      );
       return;
     }
 
     if (isPinCorrect) {
-      // --- INI ADALAH LOG PALING PENTING ---
-      print(
-        "!!! KRITIS !!! DEBUG::PIN_SCREEN: PIN BENAR. AKAN MEMANGGIL onVerificationSuccess SEKARANG.",
-      );
       widget.onVerificationSuccess();
     } else {
-      print("DEBUG::PIN_SCREEN: PIN SALAH. Menampilkan SnackBar.");
+      _failedAttempts++;
+      widget.onVerificationFailed?.call(_failedAttempts);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Incorrect PIN. Please try again.'),
@@ -90,17 +63,6 @@ class _PinVerificationScreenState extends ConsumerState<PinVerificationScreen> {
   Widget build(BuildContext context) {
     final pinState = ref.watch(pinProvider);
 
-    // --- Cetak log setiap kali UI di-render ulang ---
-    print("-------------------------------------------------");
-    print("DEBUG::PIN_SCREEN: build() method dipanggil.");
-    print(
-      "                   - Teks di pinController: '${pinController.text}'",
-    );
-    print(
-      "                   - pinProvider state isLoading: ${pinState.isLoading}",
-    );
-    print("-------------------------------------------------");
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -111,7 +73,7 @@ class _PinVerificationScreenState extends ConsumerState<PinVerificationScreen> {
             children: [
               const SizedBox(height: 40),
               Text(
-                widget.title, // Menggunakan title dari parameter
+                widget.title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: AppColors.font,
@@ -121,7 +83,7 @@ class _PinVerificationScreenState extends ConsumerState<PinVerificationScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                widget.subtitle, // Menggunakan subtitle dari parameter
+                widget.subtitle,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.font, fontSize: 16),
               ),
@@ -142,12 +104,12 @@ class _PinVerificationScreenState extends ConsumerState<PinVerificationScreen> {
                   counterText: "",
                   hintText: '------',
                   hintStyle: TextStyle(
-                    color: AppColors.font.withOpacity(0.5),
+                    color: AppColors.font.withValues(alpha: 0.5),
                     fontSize: 24,
                     letterSpacing: 12,
                   ),
                   filled: true,
-                  fillColor: AppColors.primary.withOpacity(0.5),
+                  fillColor: AppColors.primary.withValues(alpha: 0.5),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -157,32 +119,27 @@ class _PinVerificationScreenState extends ConsumerState<PinVerificationScreen> {
                     vertical: 14,
                   ),
                 ),
+                onChanged: (value) {
+                  if (value.length == 6) {
+                    _verifyPin();
+                  }
+                },
               ),
               const Spacer(),
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: pinState.isLoading ? null : _verifyPin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.background,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child:
-                      pinState.isLoading
-                          ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              color: AppColors.background,
-                              strokeWidth: 3,
-                            ),
-                          )
-                          : const Text('UNLOCK'),
-                ),
+              // Verify Button
+              ElevatedButton(
+                onPressed: pinState.isLoading ? null : _verifyPin,
+                child: pinState.isLoading
+                    ? const CircularProgressIndicator()
+                    : const Text(
+                        'Verify',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
+              const SizedBox(height: 20),
             ],
           ),
         ),

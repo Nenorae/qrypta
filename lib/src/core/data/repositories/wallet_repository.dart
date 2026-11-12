@@ -10,9 +10,9 @@ class WalletRepository {
 
   Stream<QueryResult> watchWalletAssets(String address) {
     final WatchQueryOptions options = WatchQueryOptions(
-      document: gql(getMyWalletQuery),
+      document: gql(getMyAssetsQuery),
       variables: <String, dynamic>{
-        'address': address,
+        'walletAddress': address,
       },
       fetchResults: true,
       // Using cacheAndNetwork as per the plan's DO's and DON'Ts

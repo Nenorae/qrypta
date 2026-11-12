@@ -43,7 +43,7 @@ class WelcomeScreen extends StatelessWidget {
                 'Dompet digital terpercaya untuk semua kebutuhan Anda.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.font.withOpacity(0.8),
+                  color: AppColors.font.withValues(alpha: 0.8),
                   fontSize: 16,
                 ),
               ),

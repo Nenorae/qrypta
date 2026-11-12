@@ -33,7 +33,7 @@ class AuthService {
   Future<String> generateMnemonic() async {
     log('Generating mnemonic...', name: 'AuthService');
     final mnemonic = await generateMnemonicUseCase();
-    log('Generated mnemonic: "$mnemonic"', name: 'AuthService');
+    log('Mnemonic generated successfully.', name: 'AuthService');
     return mnemonic;
   }
 
@@ -46,14 +46,13 @@ class AuthService {
   Future<String?> getPrivateKey() async {
     log('Getting private key...', name: 'AuthService');
     final privateKey = await getPrivateKeyUseCase();
-    log('Retrieved private key: $privateKey', name: 'AuthService');
+    log('Private key query completed (present: ${privateKey != null}).', name: 'AuthService');
     return privateKey;
   }
 
   Future<Map<String, String>> createWallet(String mnemonic) async {
-    log('Creating wallet with mnemonic: "$mnemonic"', name: 'AuthService');
+    log('Creating wallet...', name: 'AuthService');
     final privateKey = await getPrivateKeyFromMnemonicUseCase(mnemonic);
-    log('Derived private key: $privateKey', name: 'AuthService');
     final publicKey = await getPublicKeyUseCase(privateKey);
     log('Derived public key: $publicKey', name: 'AuthService');
     await savePrivateKey(privateKey);

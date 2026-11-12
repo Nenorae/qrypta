@@ -24,23 +24,18 @@ class _WalletSetupSeedVerificationScreenState extends ConsumerState<WalletSetupS
   void initState() {
     super.initState();
     log('Initializing WalletSetupSeedVerificationScreen', name: 'WalletSetupSeedVerificationScreen');
-    log('Original seed phrase: ${widget.seedPhrase.join(' ')}', name: 'WalletSetupSeedVerificationScreen');
     shuffledSeedPhrase = List.from(widget.seedPhrase)..shuffle();
-    log('Shuffled seed phrase: ${shuffledSeedPhrase.join(' ')}', name: 'WalletSetupSeedVerificationScreen');
   }
 
   void _onWordSelected(String word) {
     setState(() {
-      log('Word selected: $word', name: 'WalletSetupSeedVerificationScreen');
       selectedWords.add(word);
       shuffledSeedPhrase.remove(word);
-      log('Selected words: ${selectedWords.join(' ')}', name: 'WalletSetupSeedVerificationScreen');
     });
   }
 
   void _onWordDeselected(String word) {
     setState(() {
-      log('Word deselected: $word', name: 'WalletSetupSeedVerificationScreen');
       selectedWords.remove(word);
       shuffledSeedPhrase.add(word);
       log('Selected words: ${selectedWords.join(' ')}', name: 'WalletSetupSeedVerificationScreen');
@@ -104,7 +99,7 @@ class _WalletSetupSeedVerificationScreenState extends ConsumerState<WalletSetupS
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.5),
+                  color: AppColors.primary.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Wrap(

@@ -45,7 +45,7 @@ class WalletSetupScreen extends StatelessWidget {
                 'Dompet kripto pribadi yang aman dan terdesentralisasi.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.font.withOpacity(0.8),
+                  color: AppColors.font.withValues(alpha: 0.8),
                   fontSize: 16,
                 ),
               ),

@@ -17,7 +17,7 @@ class WalletSetupSeedPhraseScreen extends ConsumerWidget {
       log('mnemonicProvider listener triggered', name: 'WalletSetupSeedPhraseScreen');
       if (next is AsyncData<String>) {
         final mnemonicValue = next.value;
-        log('Mnemonic received: "$mnemonicValue"', name: 'WalletSetupSeedPhraseScreen');
+        log('Mnemonic received successfully', name: 'WalletSetupSeedPhraseScreen');
         final saveMnemonic = ref.read(saveMnemonicUseCaseProvider);
         log('Calling saveMnemonic use case', name: 'WalletSetupSeedPhraseScreen');
         saveMnemonic(mnemonicValue).then((_) {
@@ -34,7 +34,7 @@ class WalletSetupSeedPhraseScreen extends ConsumerWidget {
       body: SafeArea(
         child: mnemonicAsyncValue.when(
           data: (mnemonic) {
-            log('Mnemonic data available: "$mnemonic"', name: 'WalletSetupSeedPhraseScreen');
+            log('Mnemonic data available', name: 'WalletSetupSeedPhraseScreen');
             final seedPhrase = mnemonic.split(' ');
             return Padding(
               padding: const EdgeInsets.all(24.0),

@@ -1,17 +1,24 @@
-
 // lib/src/core/config/blockchain_config.dart
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class BlockchainConfig {
-  // Ganti dengan URL RPC node Besu Anda
-  static const String rpcUrl = "http://100.92.191.4:8545"; // Contoh: localhost
+  /// RPC URL for Hyperledger Besu node
+  static String get rpcUrl =>
+      dotenv.isInitialized ? (dotenv.env['RPC_URL'] ?? 'http://127.0.0.1:8545') : 'http://127.0.0.1:8545';
 
-  // Ganti dengan Chain ID jaringan Besu Anda
-  // Ini sangat penting untuk transaksi di jaringan privat
-  static const int chainId = 1337; // Contoh umum untuk jaringan pengembangan
+  /// Chain ID for Besu network
+  static int get chainId =>
+      int.tryParse(dotenv.isInitialized ? (dotenv.env['CHAIN_ID'] ?? '1337') : '1337') ?? 1337;
 
-  // Nama jaringan untuk ditampilkan di UI (opsional)
-  static const String name = "Besu Private Net";
+  /// Network name for display in UI
+  static String get name =>
+      dotenv.isInitialized ? (dotenv.env['NETWORK_NAME'] ?? 'Hyperledger Besu Bali Net') : 'Hyperledger Besu Bali Net';
 
-  // Simbol mata uang jaringan Anda (misalnya, ETH)
-  static const String currencySymbol = "ETH";
+  /// Native currency symbol
+  static String get currencySymbol =>
+      dotenv.isInitialized ? (dotenv.env['CURRENCY_SYMBOL'] ?? 'ETH') : 'ETH';
+
+  /// ezsign-core Fastify middleware API base URL
+  static String get ezsignApiUrl =>
+      dotenv.isInitialized ? (dotenv.env['EZSIGN_API_URL'] ?? 'http://127.0.0.1:3000/api/v1') : 'http://127.0.0.1:3000/api/v1';
 }

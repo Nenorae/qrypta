@@ -29,7 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void _importWallet() async {
     if (_formKey.currentState!.validate()) {
       final mnemonic = _mnemonicController.text.trim();
-      log('Attempting to import wallet with mnemonic: $mnemonic', name: 'LoginScreen');
+      log('Attempting to import wallet...', name: 'LoginScreen');
 
       // 1. Get the auth service and validate the mnemonic
       final authService = ref.read(authServiceProvider);
@@ -97,9 +97,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: const TextStyle(color: AppColors.font),
                   decoration: InputDecoration(
                     hintText: 'Seed phrase...',
-                    hintStyle: TextStyle(color: AppColors.font.withOpacity(0.5)),
+                    hintStyle: TextStyle(color: AppColors.font.withValues(alpha: 0.5)),
                     filled: true,
-                    fillColor: AppColors.primary.withOpacity(0.5),
+                    fillColor: AppColors.primary.withValues(alpha: 0.5),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
