@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
-import 'package:hive_ce_flutter/hive_flutter.dart';
 
 // Placeholder GraphQL endpoint. Please update this with your actual GraphQL server URL.
 const String _kGraphQLEndpoint = 'http://100.92.191.4:4000/graphql';

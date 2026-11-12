@@ -34,7 +34,7 @@ class TokenListItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '${(token.balance / BigInt.from(10).pow(token.decimals)).toStringAsFixed(2)}',
+              (token.balance / BigInt.from(10).pow(token.decimals)).toStringAsFixed(2),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
