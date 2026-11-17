@@ -1,0 +1,100 @@
+version: '3.8'
+
+# ==============================================================================
+# docker-compose.staging.yml
+# Staging Environment: Hyperledger Besu, ezsign-core (Fastify), PostgreSQL,
+# and Caddy Reverse Proxy TLS.
+# Sesuai spesifikasi RENCANA_KERJA_ELIMINASI_FALLBACK_PALSU.md (Phase 0.3)
+# ==============================================================================
+
+services:
+  # 1. Hyperledger Besu Private Testnet (Chain ID: 1338)
+  besu-staging:
+    image: hyperledger/besu:24.4.0
+    container_name: qrypta-besu-staging
+    restart: unless-stopped
+    command:
+      - --network=dev
+      - --rpc-http-enabled=true
+      - --rpc-http-host=0.0.0.0
+      - --rpc-http-port=8545
+      - --rpc-http-api=ETH,NET,WEB3,TXPOOL
+      - --rpc-http-cors-origins=*
+      - --host-allowlist=*
+      - --rpc-ws-enabled=true
+      - --rpc-ws-host=0.0.0.0
+      - --rpc-ws-port=8546
+      - --rpc-ws-api=ETH,NET,WEB3
+      - --data-path=/var/lib/besu/data
+    volumes:
+      - besu_staging_data:/var/lib/besu/data
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+    networks:
+      - qrypta-staging-net
+
+  # 2. PostgreSQL for ezsign-core Middleware & Audit Vault
+  postgres-staging:
+    image: postgres:16-alpine
+    container_name: qrypta-postgres-staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ezsign_staging
+      POSTGRES_USER: ezsign_user
+      POSTGRES_PASSWORD: ezsign_staging_secure_pass
+    volumes:
+      - pg_staging_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - qrypta-staging-net
+
+  # 3. ezsign-core Fastify Middleware (Identity, Consent, Merchant Handshake)
+  ezsign-core-staging:
+    image: node:20-alpine
+    container_name: qrypta-ezsign-staging
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      NODE_ENV: staging
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://ezsign_user:ezsign_staging_secure_pass@postgres-staging:5432/ezsign_staging
+      BESU_RPC_URL: http://besu-staging:8545
+      CHAIN_ID: 1338
+      IDRT_CONTRACT_ADDRESS: "0xF12b5dd4EAD5F743C6BaA640B0216200e89B60Da"
+      BAPENDA_TREASURY_ADDRESS: "0x3565E871c841A8cE127B0e05Eb512a865F93845B"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - besu-staging
+      - postgres-staging
+    networks:
+      - qrypta-staging-net
+
+  # 4. Reverse Proxy TLS (Caddy)
+  caddy-staging:
+    image: caddy:2-alpine
+    container_name: qrypta-caddy-staging
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      STAGING_DOMAIN: ${STAGING_DOMAIN:-staging.qrypta.local}
+    volumes:
+      - caddy_staging_data:/data
+      - caddy_staging_config:/config
+    networks:
+      - qrypta-staging-net
+
+volumes:
+  besu_staging_data:
+  pg_staging_data:
+  caddy_staging_data:
+  caddy_staging_config:
+
+networks:
+  qrypta-staging-net:
+    driver: bridge
