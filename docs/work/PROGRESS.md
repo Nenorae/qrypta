@@ -12,7 +12,7 @@
 | Phase | Fokus Pekerjaan | Estimasi | Status | Catatan / Target |
 | :--- | :--- | :--- | :--- | :--- |
 | **Phase 0** | **Baseline, Reproduksi, Guard CI, Staging Environment** | **2-3 h** | **✅ Selesai** | **Baseline lengkap, 94 catch diinventarisir, reality-guard CI merah aktif.** |
-| Phase 1 | Konfigurasi Dinamis & Sanitasi Jaringan (.env & Dart loopback) | 3-4 h | ⬜ Belum | F-02, F-20, migrasi ke `AppConfig`, hapus `.env` dari assets. |
+| **Phase 1** | **Konfigurasi Dinamis & Sanitasi Jaringan (.env & Dart loopback)** | **3-4 h** | **✅ Selesai** | **F-02, F-20 tuntas: AppConfig compile-time defines, ConfigValidator (R5), NetworkHealthService, permission manifest.** |
 | Phase 2 | Fondasi Arsitektur (AppFailure, Tx State Machine, Hive Outbox) | 3 h | ⬜ Belum | Penghentian silent swallow, outbox sync offline. |
 | Phase 3 | Transaksi Finansial Nyata (Tourist Levy ERC-20 & QRIS IDRT) | 5-6 h | ⬜ Belum | F-03, F-03b, F-04, F-09, F-09b, F-10, F-10b. |
 | Phase 4 | Consent, Revocation & Financial Audit Nyata | 5 h | ⬜ Belum | F-05, F-06, F-07, F-12, F-12b, sanitasi 'James Wilson'. |
@@ -34,7 +34,7 @@
 | ID | Judul Singkat Masalah & Lokasi | Severity | Phase | Status | PR / Commit | Bukti & Catatan Baseline | Tanggal |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **F-01** | `MobileScanner` (barcode) dipakai untuk MRZ; `google_mlkit` tidak pernah dipanggil | Kritis | 5A | ⬜ Belum | - | Terverifikasi di `mrz_scanner_screen.dart:295`. ML Kit tidak diimpor sama sekali di `lib/`. | 2026-11-17 |
-| **F-02** | `.env` berisi `127.0.0.1` dikemas ke bundle asset APK rilis | Kritis | 1 | ⬜ Belum | - | Terverifikasi di `pubspec.yaml:68` dan `.env:2,4,7`. | 2026-11-17 |
+| **F-02** | `.env` berisi `127.0.0.1` dikemas ke bundle asset APK rilis | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | `.env` dihapus dari assets & `.gitignore`, dependensi `flutter_dotenv` dibuang, migrasi ke `AppConfig`. | 2026-11-17 |
 | **F-03** | Fallback hash keccak256 palsu saat pembayaran Tourist Levy via wallet gagal | Kritis | 3 | ⬜ Belum | - | Terverifikasi di `payment_controller.dart:210-212`. Hash dibuat dari seed lokal. | 2026-11-17 |
 | **F-03b** | Jalur Visa/Counter QR di `payment_controller.dart` juga memproduksi hash keccak256 palsu | Kritis | 3 | ⬜ Belum | - | Terverifikasi di `payment_controller.dart:217-219`. Blok `else` bypass tanpa PJP nyata. | 2026-11-17 |
 | **F-04** | Fallback hash keccak256 palsu saat pembayaran QRIS merchant via wallet gagal | Kritis | 3 | ⬜ Belum | - | Terverifikasi di `payment_controller.dart:346-348`. Rekayasa hash saat RPC Besu mati. | 2026-11-17 |
@@ -60,9 +60,9 @@
 | **F-17** | Modul pembacaan chip NFC & Passive Authentication hanya simulasi timer | Sedang | 8 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:102,420`. | 2026-11-17 |
 | **F-18** | Liveness wajah dummy skor 98.7% tanpa label simulasi | Rendah | 9 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:790` (MATCH SCORE: 98.7%). | 2026-11-17 |
 | **F-19** | Tombol "Fast Demo Mode" di welcome screen & factory `demoJamesWilson()` di `lib/` | Kritis | 0/5A | ⬜ Belum | - | Terverifikasi di `welcome_screen.dart:225-248` & `mrz_parser.dart:58`. | 2026-11-17 |
-| **F-20** | Alamat loopback `127.0.0.1` hardcoded langsung di kode Dart (bukan hanya .env) | Kritis | 1 | ⬜ Belum | - | Terverifikasi di `blockchain_config.dart:7,23` dan `graphql_provider.dart:7-8`. | 2026-11-17 |
+| **F-20** | Alamat loopback `127.0.0.1` hardcoded langsung di kode Dart (bukan hanya .env) | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `blockchain_config.dart`, `graphql_provider.dart`, `payment_controller.dart`. Check 7 Reality Guard lolos hijau. | 2026-11-17 |
 | **F-21** | Blok `catch (_) {}` kosong total tanpa logging ditemukan di 14 titik | Tinggi | 2/3/4 | ⬜ Belum | - | Terverifikasi: 14 titik di `payment_controller`, `transaction_service`, dll. | 2026-11-17 |
-| **F-22** | Android Manifest tidak mendeklarasikan izin `CAMERA` & `NFC` di manifest utama | Tinggi | 1/5A/8 | ⬜ Belum | - | Terverifikasi di `android/app/src/main/AndroidManifest.xml` (hanya `INTERNET`). | 2026-11-17 |
+| **F-22** | Android Manifest tidak mendeklarasikan izin `CAMERA` & `NFC` di manifest utama | Tinggi | 1/5A/8 | 🔄 Parsial (Manifest) | Branch `fix/real-behavior` | Izin `CAMERA` & `NFC` ditambahkan ke `AndroidManifest.xml` utama; security config cleartext debug ditambahkan. | 2026-11-17 |
 | **F-23** | Dependensi `camera` tidak terpasang di `pubspec.yaml` untuk frame OCR ML Kit | Kritis | 5A | ⬜ Belum | - | Terverifikasi di `pubspec.lock`: `camera: NOT INSTALLED`. | 2026-11-17 |
 | **F-24** | Tombol quick test di `send_scanner_screen.dart` memuat fixture JSON merchant statis | Sedang | 6 | ⬜ Belum | - | Terverifikasi di `send_scanner_screen.dart:143,186`. | 2026-11-17 |
 
@@ -78,3 +78,13 @@
 - **Penegakan Lint Dart:** Aturan `avoid_catches_without_on_clauses`, `empty_catches`, dan `only_throw_errors` diaktifkan di `analysis_options.yaml`, menghasilkan 62 warning aktif.
 - **Environment Staging:** Dibuat konfigurasi `docker-compose.staging.yml` (Besu, Postgres, ezsign-core, Caddy) dan skrip inisialisasi `tools/seed_staging.sh`.
 - **Status Akhir Phase 0:** Selesai 100%. Lanjut ke Phase 1 (Konfigurasi & Jaringan).
+
+### 17 November 2026 - Phase 1 Execution
+- **Eliminasi `.env` & flutter_dotenv (F-02):** Menghapus dependensi `flutter_dotenv` dan aset `.env` dari `pubspec.yaml`. Seluruh konfigurasi dipindahkan ke `AppConfig` via `--dart-define` / `--dart-define-from-file`.
+- **Eliminasi Hardcoded Loopback Dart (F-20):** Membersihkan `127.0.0.1` dan fallback loopback dari `blockchain_config.dart`, `graphql_provider.dart`, `token_service.dart`, dan `payment_controller.dart`. Check 7 Reality Guard kini **HIJAU** (`✅ [PASS] Tidak ada loopback hardcoded di config Dart`).
+- **Implementasi `ConfigValidator` (Golden Rule R5):** Menolak build/startup jika variabel wajib kosong atau jika build staging/prod menggunakan loopback (`127.0.0.0/8`, `localhost`, `10.0.2.2`) atau skema cleartext HTTP. Menyediakan layar `ConfigErrorApp` jika validasi gagal.
+- **Implementasi `NetworkHealthService` (Phase 1.2b):** Melakukan health check berkala dan reaktif terhadap Besu JSON-RPC (`eth_chainId`, `eth_blockNumber`) dan `ezsign-core` (`GET /health`), dengan deteksi chain mismatch dan pelaporan degradasi tanpa fake fallback. Menyediakan komponen banner `NetworkStatusBanner` di `HomeScreen`.
+- **Sanitasi Platform Android (Phase 1.3):** Menambahkan deklarasi izin `CAMERA` dan `NFC` ke `AndroidManifest.xml` utama, serta konfigurasi debug `network_security_config.xml` untuk pembatasan cleartext HTTP hanya di build debug.
+- **Template Lingkungan:** Menyiapkan `env/dev.example.json`, `env/staging.example.json`, `env/prod.example.json`, mengonfigurasi `.gitignore` untuk melindungi file JSON lokal.
+- **Pengujian Unit L1:** Dibuat 13 pengujian unit baru (`test/config_validator_test.dart` & `test/network_health_service_test.dart`). Seluruh 56 pengujian proyek lulus 100%.
+- **Status Akhir Phase 1:** Selesai 100%. Siap lanjut ke Phase 2 (Fondasi Arsitektur).

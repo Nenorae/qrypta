@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // --- IMPORTS FILE KAMU ---
+import 'package:qrypta/src/core/config/config_validator.dart';
+import 'package:qrypta/src/core/config/config_error_app.dart';
 import 'package:qrypta/src/core/config/theme/app_theme.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/auth_wrapper.dart';
@@ -19,18 +20,20 @@ import 'package:qrypta/src/core/graphql/graphql_provider.dart'
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize dotenv safely
+  // Validate compile-time configuration against Golden Rule R5
   try {
-    await dotenv.load(fileName: ".env");
-  } catch (e) {
-    debugPrint("Warning: Gagal memuat file .env: $e");
+    ConfigValidator.validate();
+  } on ConfigValidationException catch (e) {
+    debugPrint("Configuration Validation Failed (R5):\n$e");
+    runApp(ConfigErrorApp(exception: e));
+    return;
   }
 
   // Initialize Hive and open the default box for graphql_flutter.
   try {
     await Hive.initFlutter();
     await Hive.openBox('graphqlClientStore');
-  } catch (e) {
+  } on Object catch (e) {
     debugPrint("Warning: Gagal inisialisasi Hive: $e");
   }
 
@@ -99,7 +102,7 @@ class _InitializerState extends ConsumerState<Initializer> {
           MaterialPageRoute(builder: (context) => const AppLockWrapper()),
         );
       }
-    } catch (e, stack) {
+    } on Object catch (e, stack) {
       debugPrint("Error during initialization: $e\n$stack");
       if (mounted) {
         setState(() {

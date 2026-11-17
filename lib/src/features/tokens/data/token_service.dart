@@ -1,13 +1,11 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+// lib/src/features/tokens/data/token_service.dart
+import 'package:qrypta/src/core/config/app_config.dart';
 import 'package:qrypta/src/core/data/models/token_model.dart';
 
 class TokenService {
-  /// Mendapatkan daftar token yang di-hardcode dari file .env
+  /// Mendapatkan daftar token resmi (IDRT) dari konfigurasi aplikasi [AppConfig].
   List<TokenModel> getHardcodedTokens() {
-    final contractAddress = dotenv.env['IDRT_CONTRACT_ADDRESS'] ?? '';
-    final name = dotenv.env['IDRT_NAME'] ?? 'Rupiah Token';
-    final symbol = dotenv.env['IDRT_SYMBOL'] ?? 'IDRT';
-    final decimals = int.tryParse(dotenv.env['IDRT_DECIMALS'] ?? '18') ?? 18;
+    final contractAddress = AppConfig.idrtContractAddress;
 
     if (contractAddress.isEmpty) {
       return [];
@@ -16,9 +14,9 @@ class TokenService {
     return [
       TokenModel(
         contractAddress: contractAddress,
-        name: name,
-        symbol: symbol,
-        decimals: decimals,
+        name: AppConfig.idrtName,
+        symbol: AppConfig.idrtSymbol,
+        decimals: AppConfig.idrtDecimals,
         balance: BigInt.zero, // Saldo akan diupdate via blockchain RPC
       ),
     ];

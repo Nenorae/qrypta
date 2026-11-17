@@ -48,7 +48,6 @@ dependencies:
   hive_ce: ^2.0.0      
   hive_ce_flutter: ^2.0.0
   shimmer: ^3.0.0
-  flutter_dotenv: ^6.0.0
   google_mlkit_text_recognition: ^1.0.2
   intl: ^0.20.3
   wallet: ^0.0.13
@@ -65,7 +64,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - .env
     - assets/images/
     - assets/icons/
     - assets/fonts/

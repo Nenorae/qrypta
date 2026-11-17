@@ -2,7 +2,7 @@
 
 import 'dart:convert';
 import 'dart:math';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:qrypta/src/core/config/app_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qrypta/src/core/config/blockchain_config.dart';
@@ -182,13 +182,8 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
         throw Exception('Private key not available in secure storage.');
       }
 
-      final idrtAddress = dotenv.isInitialized
-          ? (dotenv.env['IDRT_CONTRACT_ADDRESS'] ??
-              '0xF12b5dd4EAD5F743C6BaA640B0216200e89B60Da')
-          : '0xF12b5dd4EAD5F743C6BaA640B0216200e89B60Da';
-      final decimals = dotenv.isInitialized
-          ? (int.tryParse(dotenv.env['IDRT_DECIMALS'] ?? '18') ?? 18)
-          : 18;
+      final idrtAddress = AppConfig.idrtContractAddress;
+      final decimals = AppConfig.idrtDecimals;
       final amountBigInt = parseAmountToBigInt('150000', decimals);
 
       try {
@@ -318,13 +313,8 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       throw Exception('Private key not available in secure storage.');
     }
 
-    final idrtAddress = dotenv.isInitialized
-        ? (dotenv.env['IDRT_CONTRACT_ADDRESS'] ??
-            '0xF12b5dd4EAD5F743C6BaA640B0216200e89B60Da')
-        : '0xF12b5dd4EAD5F743C6BaA640B0216200e89B60Da';
-    final decimals = dotenv.isInitialized
-        ? (int.tryParse(dotenv.env['IDRT_DECIMALS'] ?? '18') ?? 18)
-        : 18;
+    final idrtAddress = AppConfig.idrtContractAddress;
+    final decimals = AppConfig.idrtDecimals;
     final amountBigInt = parseAmountToBigInt(amountIdr.toString(), decimals);
 
     String txHash;

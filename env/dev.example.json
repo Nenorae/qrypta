@@ -1,0 +1,15 @@
+{
+  "FLAVOR": "dev",
+  "RPC_URL": "http://10.0.2.2:8545",
+  "CHAIN_ID": "1338",
+  "NETWORK_NAME": "Hyperledger Besu Bali Devnet",
+  "CURRENCY_SYMBOL": "ETH",
+  "GRAPHQL_URL": "http://10.0.2.2:4000/graphql",
+  "EZSIGN_API_URL": "http://10.0.2.2:3000/api/v1",
+  "IDRT_CONTRACT_ADDRESS": "0xF12b5dd4EAD5F743C6BaA640B0216200e89B60Da",
+  "IDRT_NAME": "Rupiah Token",
+  "IDRT_SYMBOL": "IDRT",
+  "IDRT_DECIMALS": "18",
+  "BAPENDA_TREASURY_ADDRESS": "0x3565E871c841A8cE127B0e05Eb512a865F93845B",
+  "LIVENESS_MODE": "simulated"
+}

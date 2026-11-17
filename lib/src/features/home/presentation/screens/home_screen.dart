@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
+import 'package:qrypta/src/core/widgets/network_status_banner.dart';
 import 'package:qrypta/src/features/home/logic/home_controller.dart';
 import 'package:qrypta/src/features/home/presentation/tabs/tab_explore.dart';
 import 'package:qrypta/src/features/home/presentation/tabs/tab_home.dart';
@@ -60,9 +61,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0F1D),
-      body: IndexedStack(
-        index: selectedIndex,
-        children: tabs,
+      body: Column(
+        children: [
+          const SafeArea(bottom: false, child: NetworkStatusBanner()),
+          Expanded(
+            child: IndexedStack(
+              index: selectedIndex,
+              children: tabs,
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavBar(selectedIndex),
       extendBody: true,

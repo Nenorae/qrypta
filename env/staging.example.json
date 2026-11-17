@@ -1,0 +1,15 @@
+{
+  "FLAVOR": "staging",
+  "RPC_URL": "https://besu-staging.qrypta.id:8545",
+  "CHAIN_ID": "1338",
+  "NETWORK_NAME": "Hyperledger Besu Bali Testnet (Staging)",
+  "CURRENCY_SYMBOL": "BALI",
+  "GRAPHQL_URL": "https://indexer.staging.qrypta.id/graphql",
+  "EZSIGN_API_URL": "https://api.staging.qrypta.id/api/v1",
+  "IDRT_CONTRACT_ADDRESS": "0xF12b5dd4EAD5F743C6BaA640B0216200e89B60Da",
+  "IDRT_NAME": "Rupiah Token",
+  "IDRT_SYMBOL": "IDRT",
+  "IDRT_DECIMALS": "18",
+  "BAPENDA_TREASURY_ADDRESS": "0x3565E871c841A8cE127B0e05Eb512a865F93845B",
+  "LIVENESS_MODE": "simulated"
+}
