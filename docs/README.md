@@ -1,6 +1,12 @@
 # Dokumentasi Teknis Qrypta & Bali Tourist ID
 
-Direktori ini memuat seluruh dokumentasi arsitektur sistem, spesifikasi protokol kriptografi, blueprint integrasi, serta analisis teknis mendalam per modul kode.
+Direktori ini memuat seluruh dokumentasi arsitektur sistem, spesifikasi protokol kriptografi, blueprint integrasi, laporan audit temuan kesalahan, serta analisis teknis mendalam per modul kode.
+
+---
+
+## 0. Laporan Audit & Debugging Lapangan
+- [Audit Temuan Kesalahan & Fallback Palsu](AUDIT_TEMUAN_KESALAHAN_DAN_FALLBACK_PALSU.md): Laporan investigasi menyeluruh atas macetnya pemindai OCR paspor fisik, konfigurasi localhost di APK rilis, seluruh blok *silent fallback* tiruan (keccak256 palsu), dan dekonstruksi hasil uji testing.
+- [Log Perbaikan R8 Build Release](RELEASE_FIX_LOG.md): Catatan teknis pemecahan error minifikasi R8 ProGuard pada paket Google ML Kit.
 
 ---
 

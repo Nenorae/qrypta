@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "/home/ganendra/aplikasi flutter/qrypta/linux"
+    "cmake.sourceDirectory": "/home/ganendra/aplikasi flutter/qrypta/linux",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }
