@@ -19,12 +19,20 @@ import 'package:qrypta/src/core/graphql/graphql_provider.dart'
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize dotenv
-  await dotenv.load(fileName: ".env");
+  // Initialize dotenv safely
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Warning: Gagal memuat file .env: $e");
+  }
 
   // Initialize Hive and open the default box for graphql_flutter.
-  await Hive.initFlutter();
-  await Hive.openBox('graphqlClientStore');
+  try {
+    await Hive.initFlutter();
+    await Hive.openBox('graphqlClientStore');
+  } catch (e) {
+    debugPrint("Warning: Gagal inisialisasi Hive: $e");
+  }
 
   final sharedPrefs = await SharedPreferences.getInstance();
 
@@ -73,6 +81,8 @@ class Initializer extends ConsumerStatefulWidget {
 }
 
 class _InitializerState extends ConsumerState<Initializer> {
+  String? _initError;
+
   @override
   void initState() {
     super.initState();
@@ -89,13 +99,57 @@ class _InitializerState extends ConsumerState<Initializer> {
           MaterialPageRoute(builder: (context) => const AppLockWrapper()),
         );
       }
-    } catch (e) {
-      debugPrint("Error during initialization: $e");
+    } catch (e, stack) {
+      debugPrint("Error during initialization: $e\n$stack");
+      if (mounted) {
+        setState(() {
+          _initError = e.toString();
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_initError != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                const SizedBox(height: 16),
+                const Text(
+                  'Gagal memuat inisialisasi aplikasi',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _initError!,
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _initError = null;
+                    });
+                    _initialize();
+                  },
+                  child: const Text('Coba Lagi'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return const Scaffold(
       backgroundColor: Colors.black, // Biar tidak putih silau saat loading
       body: Center(child: CircularProgressIndicator()),
