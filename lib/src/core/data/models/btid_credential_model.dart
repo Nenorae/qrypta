@@ -12,6 +12,7 @@ class BtidCredentialModel {
   final String stayExpiry;
   final String levyStatus;
   final String? levyReceiptRef;
+  final String? levyTxHash;
   final String walletAddress;
   final DateTime issuedAt;
 
@@ -27,6 +28,7 @@ class BtidCredentialModel {
     required this.stayExpiry,
     required this.levyStatus,
     this.levyReceiptRef,
+    this.levyTxHash,
     required this.walletAddress,
     required this.issuedAt,
   });
@@ -55,6 +57,7 @@ class BtidCredentialModel {
     String? stayExpiry,
     String? levyStatus,
     String? levyReceiptRef,
+    String? levyTxHash,
     String? walletAddress,
     DateTime? issuedAt,
   }) {
@@ -70,6 +73,7 @@ class BtidCredentialModel {
       stayExpiry: stayExpiry ?? this.stayExpiry,
       levyStatus: levyStatus ?? this.levyStatus,
       levyReceiptRef: levyReceiptRef ?? this.levyReceiptRef,
+      levyTxHash: levyTxHash ?? this.levyTxHash,
       walletAddress: walletAddress ?? this.walletAddress,
       issuedAt: issuedAt ?? this.issuedAt,
     );
@@ -88,6 +92,7 @@ class BtidCredentialModel {
       'stayExpiry': stayExpiry,
       'levyStatus': levyStatus,
       'levyReceiptRef': levyReceiptRef,
+      'levyTxHash': levyTxHash,
       'walletAddress': walletAddress,
       'issuedAt': issuedAt.toIso8601String(),
     };
@@ -106,6 +111,7 @@ class BtidCredentialModel {
       stayExpiry: json['stayExpiry'] as String? ?? '2026-11-14',
       levyStatus: json['levyStatus'] as String? ?? 'unpaid',
       levyReceiptRef: json['levyReceiptRef'] as String?,
+      levyTxHash: json['levyTxHash'] as String?,
       walletAddress: json['walletAddress'] as String? ?? '',
       issuedAt: json['issuedAt'] != null
           ? DateTime.tryParse(json['issuedAt'] as String) ?? DateTime.now()

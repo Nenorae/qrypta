@@ -14,7 +14,7 @@
 | **Phase 0** | **Baseline, Reproduksi, Guard CI, Staging Environment** | **2-3 h** | **✅ Selesai** | **Baseline lengkap, 94 catch diinventarisir, reality-guard CI merah aktif.** |
 | **Phase 1** | **Konfigurasi Dinamis & Sanitasi Jaringan (.env & Dart loopback)** | **3-4 h** | **✅ Selesai** | **F-02, F-20 tuntas: AppConfig compile-time defines, ConfigValidator (R5), NetworkHealthService, permission manifest.** |
 | **Phase 2** | **Fondasi Arsitektur (AppFailure, Tx State Machine, Hive Outbox)** | **3 h** | **✅ Selesai** | **AppFailure taxonomy, TxStateMachine & TxRecovery, Hive OutboxWorker idempoten, AuditMigrationService.** |
-| Phase 3 | Transaksi Finansial Nyata (Tourist Levy ERC-20 & QRIS IDRT) | 5-6 h | ⬜ Belum | F-03, F-03b, F-04, F-09, F-09b, F-10, F-10b. |
+| **Phase 3** | **Transaksi Finansial Nyata (Tourist Levy ERC-20 & QRIS IDRT)** | **5-6 h** | **✅ Selesai** | **F-03, F-03b, F-04, F-09, F-09b, F-10, F-10b tuntas: eliminasi fallback hash, single-source idrtBalanceProvider.** |
 | Phase 4 | Consent, Revocation & Financial Audit Nyata | 5 h | ⬜ Belum | F-05, F-06, F-07, F-12, F-12b, sanitasi 'James Wilson'. |
 | Phase 5A | Mesin OCR MRZ Paspor Nyata (Google ML Kit Text Recognition) | 6-8 h | ⬜ Belum | F-01, F-19 (eliminasi MobileScanner & bypass demo). |
 | Phase 5B | Penerbitan BTID Otoritatif & Sanitasi Data Identitas | 4 h | ⬜ Belum | F-08, F-11, F-11b, F-13, F-13b (eliminasi BTID/DOB statis). |
@@ -35,17 +35,17 @@
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **F-01** | `MobileScanner` (barcode) dipakai untuk MRZ; `google_mlkit` tidak pernah dipanggil | Kritis | 5A | ⬜ Belum | - | Terverifikasi di `mrz_scanner_screen.dart:295`. ML Kit tidak diimpor sama sekali di `lib/`. | 2026-11-17 |
 | **F-02** | `.env` berisi `127.0.0.1` dikemas ke bundle asset APK rilis | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | `.env` dihapus dari assets & `.gitignore`, dependensi `flutter_dotenv` dibuang, migrasi ke `AppConfig`. | 2026-11-17 |
-| **F-03** | Fallback hash keccak256 palsu saat pembayaran Tourist Levy via wallet gagal | Kritis | 3 | ⬜ Belum | - | Terverifikasi di `payment_controller.dart:210-212`. Hash dibuat dari seed lokal. | 2026-11-17 |
-| **F-03b** | Jalur Visa/Counter QR di `payment_controller.dart` juga memproduksi hash keccak256 palsu | Kritis | 3 | ⬜ Belum | - | Terverifikasi di `payment_controller.dart:217-219`. Blok `else` bypass tanpa PJP nyata. | 2026-11-17 |
-| **F-04** | Fallback hash keccak256 palsu saat pembayaran QRIS merchant via wallet gagal | Kritis | 3 | ⬜ Belum | - | Terverifikasi di `payment_controller.dart:346-348`. Rekayasa hash saat RPC Besu mati. | 2026-11-17 |
+| **F-03** | Fallback hash keccak256 palsu saat pembayaran Tourist Levy via wallet gagal | Kritis | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `payment_controller.dart`. Transaksi wajib on-chain dengan receipt status 1. | 2026-11-18 |
+| **F-03b** | Jalur Visa/Counter QR di `payment_controller.dart` juga memproduksi hash keccak256 palsu | Kritis | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `payment_controller.dart`. Metode non-wallet ditolak via ValidationFailure. | 2026-11-18 |
+| **F-04** | Fallback hash keccak256 palsu saat pembayaran QRIS merchant via wallet gagal | Kritis | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `payment_controller.dart`. Intent dikelola TxStateMachine dan diverifikasi on-chain. | 2026-11-18 |
 | **F-05** | Consent submit ditelan `catch`, otomatis disimpan status "Approved" lokal | Tinggi | 4 | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:143-161`. | 2026-11-17 |
 | **F-06** | Revocation akses ditelan `catch`, otomatis disimpan status "Revoked" lokal | Tinggi | 4 | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:226-239`. | 2026-11-17 |
 | **F-07** | Audit finansial levy & QRIS ditelan `catch` hanya dengan `developer.log` | Tinggi | 4 | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:287,352`. | 2026-11-17 |
 | **F-08** | Audit penerbitan BTID ditelan `catch`, kartu tetap terbit dengan hash keccak palsu | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:382,410`. | 2026-11-17 |
-| **F-09** | Saldo default `Rp 2.480.000` di `levy_payment_screen.dart` | Tinggi | 3 | ⬜ Belum | - | Terverifikasi di `levy_payment_screen.dart:36`. | 2026-11-17 |
-| **F-09b** | Saldo default `Rp 2.480.000` di `tab_home.dart` dan `qris_payment_screen.dart` | Tinggi | 3 | ⬜ Belum | - | Terverifikasi di `tab_home.dart:48` dan `qris_payment_screen.dart:54`. | 2026-11-17 |
-| **F-10** | Hash statis kuitansi `0x7b2f8a1e...` di `levy_payment_screen.dart` | Sedang | 3 | ⬜ Belum | - | Terverifikasi di `levy_payment_screen.dart:535`. | 2026-11-17 |
-| **F-10b** | Hash statis kuitansi `0x7b2f8a1e...` di `tab_home.dart` dan `tab_profile.dart` | Sedang | 3 | ⬜ Belum | - | Terverifikasi di `tab_home.dart:509` dan `tab_profile.dart:87`. | 2026-11-17 |
+| **F-09** | Saldo default `Rp 2.480.000` di `levy_payment_screen.dart` | Tinggi | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi, bermigrasi ke single-source idrtBalanceFormattedProvider. | 2026-11-18 |
+| **F-09b** | Saldo default `Rp 2.480.000` di `tab_home.dart` dan `qris_payment_screen.dart` | Tinggi | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari seluruh file, nol hit grep di seluruh repo. | 2026-11-18 |
+| **F-10** | Hash statis kuitansi `0x7b2f8a1e...` di `levy_payment_screen.dart` | Sedang | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi, digantikan hash on-chain riil dari state BtidCredentialModel/LevyReceiptData. | 2026-11-18 |
+| **F-10b** | Hash statis kuitansi `0x7b2f8a1e...` di `tab_home.dart` dan `tab_profile.dart` | Sedang | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari dashboard dan profil, nol hit grep di seluruh repo. | 2026-11-18 |
 | **F-11** | Nomor BTID statis `BTID-2026-4471-0938` di `btid_issued_screen.dart` | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `btid_issued_screen.dart:66`. | 2026-11-17 |
 | **F-11b** | Nomor BTID statis tersebar di 8 file tambahan (model deserializer, controller, screens) | Tinggi | 5B | ⬜ Belum | - | Terverifikasi 14 hit di 10 file (termasuk `btid_credential_model.dart:98,119`). | 2026-11-17 |
 | **F-12** | Actor `James Wilson` di 5 lokasi service audit | Tinggi | 4/5B | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:234,266,295,328,360`. | 2026-11-17 |
@@ -98,3 +98,12 @@
 - **Infrastruktur Providers:** Menyediakan `foundation_providers.dart` dan mengintegrasikan startup lifecycle di `lib/main.dart`.
 - **Pengujian Unit L1:** Dibuat 19 pengujian unit baru di `test/phase2_foundation_test.dart`. Total pengujian aktif seluruh proyek kini **75/75 lulus 100%**.
 - **Status Akhir Phase 2:** Selesai 100%. Siap melangkah ke Phase 3 (Transaksi Finansial) & Phase 4 (Consent/Audit).
+
+### 18 November 2026 - Phase 3 Execution
+- **Eliminasi Fallback Hash Palsu (F-03, F-03b, F-04):** Menghapus seluruh pembuatan hash keccak256 deterministik dari seed string di `payment_controller.dart`. Seluruh transaksi diarahkan lewat `TxStateMachine`, broadcast langsung ke node Besu, dan receipt diverifikasi via `TxRecoveryService.pollReceiptUntilMined(txHash)`.
+- **Eliminasi Jalur Simulasi Kartu Visa (F-03b):** Menolak metode pembayaran non-wallet dengan melempar `ValidationFailure` terstruktur.
+- **Eliminasi Saldo Default Statis (F-09, F-09b):** Menghapus `Rp 2.480.000` dari `levy_payment_screen.dart`, `qris_payment_screen.dart`, dan `tab_home.dart`. Seluruh saldo kini dibaca dari satu sumber: `idrtBalanceProvider` & `idrtBalanceFormattedProvider`.
+- **Eliminasi Hash Kuitansi Statis (F-10, F-10b):** Menghapus literal `0x7b2f8a1e9c4d3b5a7e6f8a9b0c1d2e3f4a5b6c7d`. Menambahkan field `levyTxHash` pada `BtidCredentialModel` sehingga kuitansi hanya menampilkan hash on-chain yang valid.
+- **Sanitasi Silent Catch (F-21):** Mengeliminasi 6 blok `catch (_) {}` kosong di `payment_controller.dart` dan 3 blok di `btid_provider.dart`.
+- **Pengujian Unit L1:** Dibuat 9 pengujian unit baru di `test/phase3_financial_transaction_test.dart`. Total pengujian aktif seluruh proyek kini **84/84 lulus 100%**.
+- **Status Akhir Phase 3:** Selesai 100%. Siap melangkah ke Phase 4 (Consent, Revocation & Financial Audit).

@@ -75,16 +75,29 @@ class _TabProfileState extends ConsumerState<TabProfile> {
               badgeColor: isPaid ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
               onTap: () {
                 if (isPaid) {
-                  final receiptRef = btidCred?.levyReceiptRef ?? 'LVY-448102';
+                  final txHash = btidCred?.levyTxHash ??
+                      (ref.read(paymentControllerProvider).lastLevyReceipt?.txHash ?? '');
+
+                  if (txHash.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Kuitansi transaksi belum terbit di blockchain.'),
+                        backgroundColor: Colors.orangeAccent,
+                      ),
+                    );
+                    return;
+                  }
+
+                  final receiptRef = btidCred?.levyReceiptRef ?? 'LVY-PENDING';
                   final receipt = LevyReceiptData(
                     receiptRef: receiptRef,
                     touristName: fullName,
                     btidNumber: btidNumber,
-                    passportMasked: btidCred?.passportMasked ?? '••••••789',
+                    passportMasked: btidCred?.passportMasked ?? '••••••',
                     amount: 'IDR 150,000',
                     amountRaw: 150000,
                     paymentMethod: 'Qrypta IDRT Wallet Balance',
-                    txHash: '0x7b2f8a1e9c4d3b5a7e6f8a9b0c1d2e3f4a5b6c7d',
+                    txHash: txHash,
                     timestamp: DateTime.now(),
                     bapendaAddress: BlockchainConfig.bapendaTreasuryAddress,
                     mrzLine1: LevyReceiptData.generateMrzLine1(receiptRef, 150000),

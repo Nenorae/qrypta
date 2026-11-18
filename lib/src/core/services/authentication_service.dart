@@ -5,7 +5,13 @@ import 'package:flutter/services.dart';
 class AuthenticationService {
   static final LocalAuthentication _auth = LocalAuthentication();
 
+  /// Mock atau bypass autentikasi untuk pengujian unit.
+  static bool? debugBypassAuth;
+
   static Future<bool> authenticate(String reason) async {
+    if (debugBypassAuth != null) {
+      return debugBypassAuth!;
+    }
     try {
       return await _auth.authenticate(
         localizedReason: reason,

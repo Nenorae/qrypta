@@ -1,19 +1,23 @@
 // lib/src/features/transaction/logic/payment_controller.dart
 
-import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:math';
-import 'package:qrypta/src/core/config/app_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:qrypta/src/core/config/app_config.dart';
 import 'package:qrypta/src/core/config/blockchain_config.dart';
+import 'package:qrypta/src/core/error/app_failure.dart';
+import 'package:qrypta/src/core/error/network_exception_adapter.dart';
+import 'package:qrypta/src/core/providers/foundation_providers.dart';
 import 'package:qrypta/src/core/services/authentication_service.dart';
 import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
+import 'package:qrypta/src/core/transaction/state_machine/tx_state.dart';
+import 'package:qrypta/src/core/transaction/state_machine/tx_state_machine.dart';
 import 'package:qrypta/src/core/utils/formatters.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/btid_provider.dart';
 import 'package:qrypta/src/features/tokens/presentation/providers/token_provider.dart';
 import 'package:qrypta/src/features/verification/logic/verification_controller.dart';
-import 'package:web3dart/crypto.dart';
 
 /// Model Kuitansi Resmi Tourist Levy Bali
 class LevyReceiptData {
@@ -45,16 +49,12 @@ class LevyReceiptData {
     required this.mrzLine2,
   });
 
-  /// Menghasilkan Line 1 Pita MRZ Retribusi (TD3 - 44 Karakter)
-  /// Format: LEVY<<LVY<XXXXXX<<IDR150000<<<<<<<<<<<<<<
   static String generateMrzLine1(String levyRef, int amount) {
     final cleanRef = levyRef.replaceAll('-', '<');
     final raw = 'LEVY<<$cleanRef<<IDR$amount';
     return raw.length > 44 ? raw.substring(0, 44) : raw.padRight(44, '<');
   }
 
-  /// Menghasilkan Line 2 Pita MRZ Retribusi (TD3 - 44 Karakter)
-  /// Format: BTID<<BTID<YYYY<XXXX<XXXX<<PAID<<<<<<<<<<
   static String generateMrzLine2(String btidNumber) {
     final cleanBtid = btidNumber.replaceAll('-', '<');
     final raw = 'BTID<<$cleanBtid<<PAID';
@@ -92,7 +92,7 @@ class QrisReceiptData {
   });
 }
 
-/// State untuk Operasi Pembayaran
+/// State Operasi Pembayaran
 class PaymentState {
   final bool isLoading;
   final bool isTransferring;
@@ -135,108 +135,158 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
 
   PaymentNotifier(this.ref) : super(const PaymentState());
 
-  /// Eksekusi Pembayaran Tourist Levy (ScrLevyPay)
-  /// [paymentMethod]: 'wallet' (Qrypta IDRT), 'card' (Visa •••• 4218), atau 'qr'
+  /// Eksekusi Pembayaran Tourist Levy (ScrLevyPay) on-chain tanpa fallback palsu
   Future<LevyReceiptData> payTouristLevy({
     required String paymentMethod,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
-    // 1. Otorisasi Biometrik / PIN Pengguna
+    // 1. Otorisasi Biometrik / PIN
     final authOk = await AuthenticationService.authenticate(
       'Authorize Bali Tourist Levy payment (IDR 150,000)',
     );
 
     if (!authOk) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Biometric authorization canceled or failed.',
-      );
-      throw Exception('Biometric authorization canceled or failed.');
+      const failure = ValidationFailure('Otorisasi biometrik/PIN dibatalkan atau gagal.');
+      state = state.copyWith(isLoading: false, errorMessage: failure.message);
+      throw failure;
     }
 
+    // 2. Validasi kredensial BTID
     final btidCred = ref.read(btidCredentialProvider);
-    final btid = btidCred?.btidNumber ?? 'BTID-2026-4471-0938';
-    final touristName = btidCred?.fullName ?? 'James Wilson';
-    final passportMasked = btidCred?.passportMasked ?? '••••••789';
-    final userWallet = btidCred?.walletAddress ??
-        '0x71CB05EE1b1F506fF321Da3CE92a540AC401B4D0';
+    if (btidCred == null || btidCred.walletAddress.isEmpty) {
+      const failure = ValidationFailure('Kredensial BTID belum aktif atau dompet belum siap.');
+      state = state.copyWith(isLoading: false, errorMessage: failure.message);
+      throw failure;
+    }
+
+    if (btidCred.isLevyPaid) {
+      const failure = ValidationFailure('Tourist Levy sudah berstatus lunas (Paid).');
+      state = state.copyWith(isLoading: false, errorMessage: failure.message);
+      throw failure;
+    }
+
+    // 3. Validasi metode pembayaran (F-03b: non-wallet ditolak transparan)
+    if (paymentMethod != 'wallet') {
+      final failure = ValidationFailure(
+        'Metode pembayaran $paymentMethod belum tersedia untuk penyelesaian on-chain resmi.',
+      );
+      state = state.copyWith(isLoading: false, errorMessage: failure.message);
+      throw failure;
+    }
+
+    final userWallet = btidCred.walletAddress;
+    final btid = btidCred.btidNumber;
+    final touristName = btidCred.fullName;
+    final passportMasked = btidCred.passportMasked;
     final bapendaTreasury = BlockchainConfig.bapendaTreasuryAddress;
 
     final rand = Random();
     final levyRef = 'LVY-${100000 + rand.nextInt(900000)}';
-    String txHash;
 
-    if (paymentMethod == 'wallet') {
-      state = state.copyWith(isTransferring: true);
-      final blockchainService = ref.read(blockchainServiceProvider);
-      final getPrivateKey = ref.read(getPrivateKeyUseCaseProvider);
-      final privateKey = await getPrivateKey();
+    final blockchainService = ref.read(blockchainServiceProvider);
+    final getPrivateKey = ref.read(getPrivateKeyUseCaseProvider);
+    final privateKey = await getPrivateKey();
 
-      if (privateKey == null || privateKey.isEmpty) {
-        state = state.copyWith(
-          isLoading: false,
-          isTransferring: false,
-          errorMessage: 'Private key not available in secure storage.',
-        );
-        throw Exception('Private key not available in secure storage.');
-      }
-
-      final idrtAddress = AppConfig.idrtContractAddress;
-      final decimals = AppConfig.idrtDecimals;
-      final amountBigInt = parseAmountToBigInt('150000', decimals);
-
-      try {
-        txHash = await blockchainService.erc20.sendErc20Token(
-          privateKey: privateKey,
-          contractHex: idrtAddress,
-          recipientHex: bapendaTreasury,
-          amount: amountBigInt,
-        );
-
-        // Tunggu receipt konfirmasi Besu secara non-blocking
-        try {
-          await blockchainService.transaction
-              .waitForTransactionReceipt(txHash)
-              .timeout(const Duration(seconds: 4));
-        } catch (_) {}
-      } catch (e) {
-        // Fallback deterministik jika node Besu lokal belum dijalankan
-        final fallbackSeed =
-            '$levyRef-$userWallet-${DateTime.now().millisecondsSinceEpoch}';
-        txHash = '0x${bytesToHex(keccak256(utf8.encode(fallbackSeed)))}';
-      }
-    } else {
-      // Metode Simulasi Kartu Visa atau Counter QR
-      await Future.delayed(const Duration(milliseconds: 1400));
-      final fallbackSeed =
-          '$levyRef-card-${DateTime.now().millisecondsSinceEpoch}';
-      txHash = '0x${bytesToHex(keccak256(utf8.encode(fallbackSeed)))}';
+    if (privateKey == null || privateKey.isEmpty) {
+      const failure = ValidationFailure('Private key tidak tersedia di secure storage.');
+      state = state.copyWith(isLoading: false, isTransferring: false, errorMessage: failure.message);
+      throw failure;
     }
 
-    // 2. Kirim pencatatan audit ke Fastify middleware ezsign-core & simpan lokal
-    final verificationService =
-        ref.read(blockchainServiceProvider).verification;
-    await verificationService.recordLevyPaymentAudit(
-      levyRef: levyRef,
-      txHash: txHash,
-      btid: btid,
-      amountFormatted: 'IDR 150,000',
-      walletAddress: userWallet,
+    final idrtAddress = AppConfig.idrtContractAddress;
+    final decimals = AppConfig.idrtDecimals;
+    final amountBigInt = parseAmountToBigInt('150000', decimals);
+
+    // 4. Inisialisasi State Machine transaksi
+    final txRepo = ref.read(txIntentRepositoryProvider);
+    final txRecovery = ref.read(txRecoveryServiceProvider);
+    final stateMachine = TxStateMachine(repository: txRepo);
+
+    await stateMachine.startIntent(
+      kind: 'levy',
+      ref: levyRef,
+      from: userWallet,
+      to: bapendaTreasury,
+      amount: amountBigInt.toString(),
     );
 
-    // 3. Mutasi State BTID: ubah levyStatus menjadi 'paid'
+    state = state.copyWith(isTransferring: true);
+
+    String txHash;
+    try {
+      try {
+        final currentBalance = await blockchainService.erc20.getErc20Balance(
+          idrtAddress,
+          userWallet,
+        );
+        if (currentBalance < amountBigInt) {
+          throw const InsufficientBalance(
+            'Saldo IDRT tidak mencukupi untuk pembayaran retribusi (butuh Rp 150.000).',
+          );
+        }
+      } on AppFailure {
+        rethrow;
+      } on Object catch (e) {
+        developer.log('Pengecekan saldo awal lewati ke broadcast: $e', name: 'PaymentController');
+      }
+
+      await stateMachine.transitionTo(TxState.signing);
+      await stateMachine.transitionTo(TxState.broadcasting);
+
+      txHash = await blockchainService.erc20.sendErc20Token(
+        privateKey: privateKey,
+        contractHex: idrtAddress,
+        recipientHex: bapendaTreasury,
+        amount: amountBigInt,
+      );
+
+      await stateMachine.transitionTo(TxState.pending, txHash: txHash);
+
+      final receipt = await txRecovery.pollReceiptUntilMined(txHash);
+
+      await stateMachine.transitionTo(
+        TxState.confirmed,
+        blockNumber: BigInt.from(receipt.blockNumber.blockNum),
+      );
+    } on Object catch (e) {
+      final failure = NetworkExceptionAdapter.fromException(e);
+      await stateMachine.transitionTo(
+        TxState.failed,
+        failureReason: failure.message,
+      );
+      state = state.copyWith(
+        isLoading: false,
+        isTransferring: false,
+        errorMessage: failure.message,
+      );
+      throw failure;
+    }
+
+    // 5. Catat audit finansial & update status lokal
+    final verificationService = ref.read(blockchainServiceProvider).verification;
+    try {
+      await verificationService.recordLevyPaymentAudit(
+        levyRef: levyRef,
+        txHash: txHash,
+        btid: btid,
+        amountFormatted: 'IDR 150,000',
+        walletAddress: userWallet,
+      );
+    } on Object catch (e) {
+      developer.log('Pencatatan audit levy server tertunda: $e', name: 'PaymentController');
+    }
+
     await ref
         .read(btidCredentialProvider.notifier)
-        .updateLevyStatus('paid', receiptRef: levyRef);
+        .updateLevyStatus('paid', receiptRef: levyRef, txHash: txHash);
 
-    // 4. Sinkronisasi saldo token dan audit history
     try {
       await ref.read(tokenNotifierProvider.notifier).fetchUserTokens();
-    } catch (_) {}
-    try {
       await ref.read(verificationControllerProvider.notifier).loadAuditHistory();
-    } catch (_) {}
+    } on Object catch (e) {
+      developer.log('Penyegaran state pasca-transaksi: $e', name: 'PaymentController');
+    }
 
     final receipt = LevyReceiptData(
       receiptRef: levyRef,
@@ -245,9 +295,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       passportMasked: passportMasked,
       amount: 'IDR 150,000',
       amountRaw: 150000,
-      paymentMethod: paymentMethod == 'wallet'
-          ? 'Qrypta IDRT Wallet Balance'
-          : (paymentMethod == 'card' ? 'Visa •••• 4218' : 'Airport Counter QR'),
+      paymentMethod: 'Qrypta IDRT Wallet Balance',
       txHash: txHash,
       timestamp: DateTime.now(),
       bapendaAddress: bapendaTreasury,
@@ -264,7 +312,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
     return receipt;
   }
 
-  /// Eksekusi Pembayaran Merchant QRIS Berbasis IDRT (ScrPay)
+  /// Eksekusi Pembayaran Merchant QRIS on-chain tanpa fallback palsu
   Future<QrisReceiptData> payQrisMerchant({
     required String merchantName,
     required String merchantId,
@@ -280,45 +328,78 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       decimalDigits: 0,
     ).format(amountIdr);
 
-    // 1. Otorisasi Biometrik / PIN Pengguna
+    // 1. Otorisasi PIN / Biometrik
     final authOk = await AuthenticationService.authenticate(
       'Authorize payment of $formattedAmount to $merchantName',
     );
 
     if (!authOk) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Biometric authorization canceled or failed.',
-      );
-      throw Exception('Biometric authorization canceled or failed.');
+      const failure = ValidationFailure('Otorisasi biometrik/PIN dibatalkan atau gagal.');
+      state = state.copyWith(isLoading: false, errorMessage: failure.message);
+      throw failure;
     }
 
     final btidCred = ref.read(btidCredentialProvider);
-    final userWallet = btidCred?.walletAddress ??
-        '0x71CB05EE1b1F506fF321Da3CE92a540AC401B4D0';
+    if (btidCred == null || btidCred.walletAddress.isEmpty) {
+      const failure = ValidationFailure('Kredensial BTID belum aktif atau dompet belum siap.');
+      state = state.copyWith(isLoading: false, errorMessage: failure.message);
+      throw failure;
+    }
+
+    final userWallet = btidCred.walletAddress;
     final rand = Random();
     final payRef = 'PAY-${100000 + rand.nextInt(900000)}';
 
-    state = state.copyWith(isTransferring: true);
     final blockchainService = ref.read(blockchainServiceProvider);
     final getPrivateKey = ref.read(getPrivateKeyUseCaseProvider);
     final privateKey = await getPrivateKey();
 
     if (privateKey == null || privateKey.isEmpty) {
-      state = state.copyWith(
-        isLoading: false,
-        isTransferring: false,
-        errorMessage: 'Private key not available in secure storage.',
-      );
-      throw Exception('Private key not available in secure storage.');
+      const failure = ValidationFailure('Private key tidak tersedia di secure storage.');
+      state = state.copyWith(isLoading: false, isTransferring: false, errorMessage: failure.message);
+      throw failure;
     }
 
     final idrtAddress = AppConfig.idrtContractAddress;
     final decimals = AppConfig.idrtDecimals;
     final amountBigInt = parseAmountToBigInt(amountIdr.toString(), decimals);
 
+    // 2. Inisialisasi State Machine transaksi
+    final txRepo = ref.read(txIntentRepositoryProvider);
+    final txRecovery = ref.read(txRecoveryServiceProvider);
+    final stateMachine = TxStateMachine(repository: txRepo);
+
+    await stateMachine.startIntent(
+      kind: 'qris',
+      ref: payRef,
+      from: userWallet,
+      to: merchantAddress,
+      amount: amountBigInt.toString(),
+    );
+
+    state = state.copyWith(isTransferring: true);
+
     String txHash;
     try {
+      try {
+        final currentBalance = await blockchainService.erc20.getErc20Balance(
+          idrtAddress,
+          userWallet,
+        );
+        if (currentBalance < amountBigInt) {
+          throw InsufficientBalance(
+            'Saldo IDRT tidak mencukupi untuk pembayaran QRIS ($formattedAmount).',
+          );
+        }
+      } on AppFailure {
+        rethrow;
+      } on Object catch (e) {
+        developer.log('Pengecekan saldo QRIS lewati ke broadcast: $e', name: 'PaymentController');
+      }
+
+      await stateMachine.transitionTo(TxState.signing);
+      await stateMachine.transitionTo(TxState.broadcasting);
+
       txHash = await blockchainService.erc20.sendErc20Token(
         privateKey: privateKey,
         contractHex: idrtAddress,
@@ -326,38 +407,50 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
         amount: amountBigInt,
       );
 
-      try {
-        await blockchainService.transaction
-            .waitForTransactionReceipt(txHash)
-            .timeout(const Duration(seconds: 4));
-      } catch (_) {}
-    } catch (e) {
-      // Deterministic simulation fallback
-      final fallbackSeed =
-          '$payRef-$userWallet-${DateTime.now().millisecondsSinceEpoch}';
-      txHash = '0x${bytesToHex(keccak256(utf8.encode(fallbackSeed)))}';
+      await stateMachine.transitionTo(TxState.pending, txHash: txHash);
+
+      final receipt = await txRecovery.pollReceiptUntilMined(txHash);
+
+      await stateMachine.transitionTo(
+        TxState.confirmed,
+        blockNumber: BigInt.from(receipt.blockNumber.blockNum),
+      );
+    } on Object catch (e) {
+      final failure = NetworkExceptionAdapter.fromException(e);
+      await stateMachine.transitionTo(
+        TxState.failed,
+        failureReason: failure.message,
+      );
+      state = state.copyWith(
+        isLoading: false,
+        isTransferring: false,
+        errorMessage: failure.message,
+      );
+      throw failure;
     }
 
-    // 2. Kirim pencatatan audit QRIS ke Fastify middleware & Hive
-    final verificationService =
-        ref.read(blockchainServiceProvider).verification;
-    await verificationService.recordQrisPaymentAudit(
-      payRef: payRef,
-      txHash: txHash,
-      merchantName: merchantName,
-      merchantId: merchantId,
-      amountFormatted: formattedAmount,
-      walletAddress: userWallet,
-      itemDescription: itemDescription,
-    );
+    // 3. Catat audit finansial QRIS
+    final verificationService = ref.read(blockchainServiceProvider).verification;
+    try {
+      await verificationService.recordQrisPaymentAudit(
+        payRef: payRef,
+        txHash: txHash,
+        merchantName: merchantName,
+        merchantId: merchantId,
+        amountFormatted: formattedAmount,
+        walletAddress: userWallet,
+        itemDescription: itemDescription,
+      );
+    } on Object catch (e) {
+      developer.log('Pencatatan audit QRIS server tertunda: $e', name: 'PaymentController');
+    }
 
-    // 3. Sinkronisasi saldo token & riwayat audit
     try {
       await ref.read(tokenNotifierProvider.notifier).fetchUserTokens();
-    } catch (_) {}
-    try {
       await ref.read(verificationControllerProvider.notifier).loadAuditHistory();
-    } catch (_) {}
+    } on Object catch (e) {
+      developer.log('Penyegaran state pasca-transaksi: $e', name: 'PaymentController');
+    }
 
     final receipt = QrisReceiptData(
       payRef: payRef,

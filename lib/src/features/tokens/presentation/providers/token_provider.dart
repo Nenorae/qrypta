@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qrypta/src/core/config/app_config.dart';
 import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
+import 'package:qrypta/src/core/utils/formatters.dart';
 import '../../../transaction/presentation/providers/transaction_providers.dart';
 import '../../data/token_service.dart';
 import '../../../../core/data/models/token_model.dart';
@@ -68,6 +70,26 @@ final tokenNotifierProvider =
     StateNotifierProvider<TokenNotifier, AsyncValue<List<TokenModel>>>((ref) {
   return TokenNotifier(
     ref: ref,
+  );
+});
+
+final idrtBalanceProvider = Provider<AsyncValue<BigInt>>((ref) {
+  final tokensAsync = ref.watch(tokenNotifierProvider);
+  return tokensAsync.whenData((tokens) {
+    final idrt = tokens.where((t) => t.symbol == 'IDRT').firstOrNull;
+    return idrt?.balance ?? BigInt.zero;
+  });
+});
+
+final idrtBalanceFormattedProvider = Provider<String>((ref) {
+  final balanceAsync = ref.watch(idrtBalanceProvider);
+  return balanceAsync.when(
+    data: (balance) {
+      final decimals = AppConfig.idrtDecimals;
+      return formatBigInt(balance, decimals, isCurrency: true);
+    },
+    loading: () => 'Memuat...',
+    error: (_, __) => 'Saldo tidak tersedia',
   );
 });
 

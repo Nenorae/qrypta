@@ -1,6 +1,7 @@
 // lib/src/features/authentication/presentation/providers/btid_provider.dart
 
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:qrypta/src/core/data/models/btid_credential_model.dart';
@@ -21,7 +22,6 @@ class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
 
   Future<void> loadCredential() async {
     try {
-      // 1. Coba baca dari Hive
       if (Hive.isBoxOpen(_btidBoxName)) {
         final box = Hive.box(_btidBoxName);
         final raw = box.get(_btidStorageKey);
@@ -37,8 +37,8 @@ class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
           return;
         }
       }
-    } catch (_) {
-      // Fallback ke SharedPreferences jika Hive belum siap di test environment
+    } on Object catch (e) {
+      developer.log('Hive loadCredential failed, trying SharedPreferences: $e', name: 'BtidProvider');
       try {
         final prefs = await SharedPreferences.getInstance();
         final rawString = prefs.getString(_btidStorageKey);
@@ -46,7 +46,9 @@ class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
           state = BtidCredentialModel.fromJson(jsonDecode(rawString));
           return;
         }
-      } catch (_) {}
+      } on Object catch (e2) {
+        developer.log('SharedPreferences loadCredential failed: $e2', name: 'BtidProvider');
+      }
     }
   }
 
@@ -60,19 +62,27 @@ class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
         box = await Hive.openBox(_btidBoxName);
       }
       await box.put(_btidStorageKey, credential.toJson());
-    } catch (_) {
+    } on Object catch (e) {
+      developer.log('Hive saveCredential failed, trying SharedPreferences: $e', name: 'BtidProvider');
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_btidStorageKey, jsonEncode(credential.toJson()));
-      } catch (_) {}
+      } on Object catch (e2) {
+        developer.log('SharedPreferences saveCredential failed: $e2', name: 'BtidProvider');
+      }
     }
   }
 
-  Future<void> updateLevyStatus(String status, {String? receiptRef}) async {
+  Future<void> updateLevyStatus(
+    String status, {
+    String? receiptRef,
+    String? txHash,
+  }) async {
     if (state == null) return;
     final updated = state!.copyWith(
       levyStatus: status,
       levyReceiptRef: receiptRef ?? state!.levyReceiptRef,
+      levyTxHash: txHash ?? state!.levyTxHash,
     );
     await saveCredential(updated);
   }
@@ -83,6 +93,8 @@ class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
       if (Hive.isBoxOpen(_btidBoxName)) {
         await Hive.box(_btidBoxName).delete(_btidStorageKey);
       }
-    } catch (_) {}
+    } on Object catch (e) {
+      developer.log('Hive clearCredential failed: $e', name: 'BtidProvider');
+    }
   }
 }

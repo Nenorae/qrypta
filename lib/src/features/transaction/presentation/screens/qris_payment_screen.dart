@@ -49,19 +49,9 @@ class _QrisPaymentScreenState extends ConsumerState<QrisPaymentScreen> {
   @override
   Widget build(BuildContext context) {
     final paymentState = ref.watch(paymentControllerProvider);
-    final tokensAsync = ref.watch(tokenNotifierProvider);
 
-    String idrtBalanceFormatted = 'Rp 2.480.000';
-    tokensAsync.whenData((tokens) {
-      final idrt = tokens.where((t) => t.symbol == 'IDRT').firstOrNull;
-      if (idrt != null && idrt.balance > BigInt.zero) {
-        idrtBalanceFormatted = formatBigInt(
-          idrt.balance,
-          idrt.decimals,
-          isCurrency: true,
-        );
-      }
-    });
+    // Ambil saldo IDRT dari provider tunggal
+    final idrtBalanceFormatted = ref.watch(idrtBalanceFormattedProvider);
 
     final currencyFormatter = NumberFormat.currency(
       locale: 'id_ID',
