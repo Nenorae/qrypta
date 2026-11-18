@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:qrypta/src/core/config/config_validator.dart';
 import 'package:qrypta/src/core/config/config_error_app.dart';
 import 'package:qrypta/src/core/config/theme/app_theme.dart';
+import 'package:qrypta/src/core/providers/foundation_providers.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/auth_wrapper.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/pin_verification_screen.dart';
@@ -29,10 +30,12 @@ void main() async {
     return;
   }
 
-  // Initialize Hive and open the default box for graphql_flutter.
+  // Initialize Hive and open default stores.
   try {
     await Hive.initFlutter();
     await Hive.openBox('graphqlClientStore');
+    await Hive.openBox('tx_intents');
+    await Hive.openBox('outbox_box');
   } on Object catch (e) {
     debugPrint("Warning: Gagal inisialisasi Hive: $e");
   }
@@ -94,6 +97,13 @@ class _InitializerState extends ConsumerState<Initializer> {
 
   Future<void> _initialize() async {
     try {
+      // Inisialisasi migrasi data audit warisan (Phase 2.4)
+      try {
+        await ref.read(auditMigrationServiceProvider).migrateAuditStore();
+      } on Object catch (e) {
+        debugPrint("Warning: Audit migration store init: $e");
+      }
+
       // Cek status login
       await ref.read(authStateProvider.future);
 

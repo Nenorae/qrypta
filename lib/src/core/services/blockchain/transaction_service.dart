@@ -250,7 +250,9 @@ class TransactionService {
           timer.cancel();
           if (!completer.isCompleted) completer.complete(receipt);
         }
-      } catch (_) {}
+      } on Object catch (e) {
+        developer.log('Polling receipt transaksi menghadapi error: $e', name: _serviceName);
+      }
     });
 
     return completer.future.timeout(

@@ -574,7 +574,7 @@ class _PrivacyAuditScreenState extends ConsumerState<PrivacyAuditScreen> {
           ),
 
           // TxHash Preview
-          if (audit.txHash.isNotEmpty) ...[
+          if (audit.txHash != null && audit.txHash!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -588,7 +588,7 @@ class _PrivacyAuditScreenState extends ConsumerState<PrivacyAuditScreen> {
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      audit.txHash,
+                      audit.txHash!,
                       style: const TextStyle(
                         color: Color(0xFFA78BFA),
                         fontFamily: 'Courier',

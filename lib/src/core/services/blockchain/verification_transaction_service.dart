@@ -438,8 +438,8 @@ class VerificationTransactionService {
         final box = await Hive.openBox(_boxName);
         await box.put(audit.txRef, audit.toJson());
       }
-    } catch (_) {
-      // Memory cache fallback for test/non-flutter isolate environments
+    } on Object catch (e) {
+      developer.log('Penyimpanan Hive gagal, fallback ke memori isolat: $e', name: _serviceName);
       final index = _memoryAuditCache.indexWhere((a) => a.txRef == audit.txRef);
       if (index >= 0) {
         _memoryAuditCache[index] = audit;
@@ -468,7 +468,8 @@ class VerificationTransactionService {
           results.add(AuditTransactionModel.fromJson(map));
         }
       }
-    } catch (_) {
+    } on Object catch (e) {
+      developer.log('Pembacaan Hive audit gagal, mengambil dari memori: $e', name: _serviceName);
       results.addAll(_memoryAuditCache);
     }
 

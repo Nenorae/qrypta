@@ -143,7 +143,7 @@ class ConsentSharedScreen extends StatelessWidget {
                         ),
                         InkWell(
                           onTap: () {
-                            Clipboard.setData(ClipboardData(text: audit.txHash));
+                            Clipboard.setData(ClipboardData(text: audit.txHash ?? 'N/A'));
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Transaction Hash copied to clipboard'),
@@ -166,7 +166,7 @@ class ConsentSharedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      audit.txHash,
+                      audit.txHash ?? 'Pending On-Chain Confirmation',
                       style: const TextStyle(
                         color: Color(0xFF5EEAD4),
                         fontFamily: 'Courier',

@@ -13,7 +13,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **Phase 0** | **Baseline, Reproduksi, Guard CI, Staging Environment** | **2-3 h** | **✅ Selesai** | **Baseline lengkap, 94 catch diinventarisir, reality-guard CI merah aktif.** |
 | **Phase 1** | **Konfigurasi Dinamis & Sanitasi Jaringan (.env & Dart loopback)** | **3-4 h** | **✅ Selesai** | **F-02, F-20 tuntas: AppConfig compile-time defines, ConfigValidator (R5), NetworkHealthService, permission manifest.** |
-| Phase 2 | Fondasi Arsitektur (AppFailure, Tx State Machine, Hive Outbox) | 3 h | ⬜ Belum | Penghentian silent swallow, outbox sync offline. |
+| **Phase 2** | **Fondasi Arsitektur (AppFailure, Tx State Machine, Hive Outbox)** | **3 h** | **✅ Selesai** | **AppFailure taxonomy, TxStateMachine & TxRecovery, Hive OutboxWorker idempoten, AuditMigrationService.** |
 | Phase 3 | Transaksi Finansial Nyata (Tourist Levy ERC-20 & QRIS IDRT) | 5-6 h | ⬜ Belum | F-03, F-03b, F-04, F-09, F-09b, F-10, F-10b. |
 | Phase 4 | Consent, Revocation & Financial Audit Nyata | 5 h | ⬜ Belum | F-05, F-06, F-07, F-12, F-12b, sanitasi 'James Wilson'. |
 | Phase 5A | Mesin OCR MRZ Paspor Nyata (Google ML Kit Text Recognition) | 6-8 h | ⬜ Belum | F-01, F-19 (eliminasi MobileScanner & bypass demo). |
@@ -61,7 +61,7 @@
 | **F-18** | Liveness wajah dummy skor 98.7% tanpa label simulasi | Rendah | 9 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:790` (MATCH SCORE: 98.7%). | 2026-11-17 |
 | **F-19** | Tombol "Fast Demo Mode" di welcome screen & factory `demoJamesWilson()` di `lib/` | Kritis | 0/5A | ⬜ Belum | - | Terverifikasi di `welcome_screen.dart:225-248` & `mrz_parser.dart:58`. | 2026-11-17 |
 | **F-20** | Alamat loopback `127.0.0.1` hardcoded langsung di kode Dart (bukan hanya .env) | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `blockchain_config.dart`, `graphql_provider.dart`, `payment_controller.dart`. Check 7 Reality Guard lolos hijau. | 2026-11-17 |
-| **F-21** | Blok `catch (_) {}` kosong total tanpa logging ditemukan di 14 titik | Tinggi | 2/3/4 | ⬜ Belum | - | Terverifikasi: 14 titik di `payment_controller`, `transaction_service`, dll. | 2026-11-17 |
+| **F-21** | Blok `catch (_) {}` kosong total tanpa logging ditemukan di 14 titik | Tinggi | 2/3/4 | 🔄 Parsial | Branch `fix/real-behavior` | Core services di Phase 2 disanitasi: `transaction_service.dart:253`, `verification_transaction_service.dart:441,471` bebas dari catch kosong. | 2026-11-18 |
 | **F-22** | Android Manifest tidak mendeklarasikan izin `CAMERA` & `NFC` di manifest utama | Tinggi | 1/5A/8 | 🔄 Parsial (Manifest) | Branch `fix/real-behavior` | Izin `CAMERA` & `NFC` ditambahkan ke `AndroidManifest.xml` utama; security config cleartext debug ditambahkan. | 2026-11-17 |
 | **F-23** | Dependensi `camera` tidak terpasang di `pubspec.yaml` untuk frame OCR ML Kit | Kritis | 5A | ⬜ Belum | - | Terverifikasi di `pubspec.lock`: `camera: NOT INSTALLED`. | 2026-11-17 |
 | **F-24** | Tombol quick test di `send_scanner_screen.dart` memuat fixture JSON merchant statis | Sedang | 6 | ⬜ Belum | - | Terverifikasi di `send_scanner_screen.dart:143,186`. | 2026-11-17 |
@@ -88,3 +88,13 @@
 - **Template Lingkungan:** Menyiapkan `env/dev.example.json`, `env/staging.example.json`, `env/prod.example.json`, mengonfigurasi `.gitignore` untuk melindungi file JSON lokal.
 - **Pengujian Unit L1:** Dibuat 13 pengujian unit baru (`test/config_validator_test.dart` & `test/network_health_service_test.dart`). Seluruh 56 pengujian proyek lulus 100%.
 - **Status Akhir Phase 1:** Selesai 100%. Siap lanjut ke Phase 2 (Fondasi Arsitektur).
+
+### 18 November 2026 - Phase 2 Execution
+- **Taksonomi Error Bertipe (AppFailure & NetworkExceptionAdapter):** Membuat `lib/src/core/error/app_failure.dart` (11 kelas error bertipe) dan `lib/src/core/error/network_exception_adapter.dart` yang membungkus seluruh pemanggilan IO, HTTP, dan JSON-RPC ke tipe terstruktur tanpa silent catch.
+- **State Machine On-Chain & Recovery (Phase 2.2):** Mengimplementasikan `TxState`, `TxIntent`, `TxIntentRepository`, `TxStateMachine`, dan `TxRecoveryService`. Menegakkan aturan transisi legal dan persistensi intent sebelum broadcast. Menyediakan polling receipt terstruktur dengan timeout 120s dan pemulihan otomatis saat aplikasi restart.
+- **Pola Outbox Server (Phase 2.3):** Membangun `OutboxItem`, `OutboxRepository`, dan `OutboxWorker` dengan backoff eksponensial (5s hingga 15m), header `Idempotency-Key` (UUID v4), serta pembedaan jelas antara penolakan client permanen (4xx) dan retry error transient (5xx/network).
+- **Sanitasi Model Audit & Migrasi Hive (Phase 2.4):** Memperbarui `AuditTransactionModel` dengan `syncStatus`, `serverId`, `anchorTxHash`, `actorWallet`, `actorRef`, dan `txHash` nullable. Menghilangkan fallback statis `'James Wilson'` (F-12b) dari `fromJson`. Mengimplementasikan `AuditMigrationService` untuk menandai seluruh record warisan lama sebagai `legacy_unverified`.
+- **Sanitasi Silent Catch (F-21):** Mengganti `catch (_) {}` kosong di `transaction_service.dart:253` dan `verification_transaction_service.dart:441,471` dengan penanganan ber-logging terstruktur.
+- **Infrastruktur Providers:** Menyediakan `foundation_providers.dart` dan mengintegrasikan startup lifecycle di `lib/main.dart`.
+- **Pengujian Unit L1:** Dibuat 19 pengujian unit baru di `test/phase2_foundation_test.dart`. Total pengujian aktif seluruh proyek kini **75/75 lulus 100%**.
+- **Status Akhir Phase 2:** Selesai 100%. Siap melangkah ke Phase 3 (Transaksi Finansial) & Phase 4 (Consent/Audit).
