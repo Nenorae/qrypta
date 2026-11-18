@@ -25,7 +25,7 @@ class _TabProfileState extends ConsumerState<TabProfile> {
   @override
   Widget build(BuildContext context) {
     final btidCred = ref.watch(btidCredentialProvider);
-    final fullName = btidCred?.fullName ?? 'James Wilson';
+    final fullName = (btidCred?.fullName.isNotEmpty == true) ? btidCred!.fullName : 'Tourist';
     final btidNumber = btidCred?.btidNumber ?? 'BTID-2026-4471-0938';
     final nationality = btidCred?.nationality ?? 'GBR';
     final isPaid = btidCred?.isLevyPaid ?? false;

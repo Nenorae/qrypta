@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
 import 'package:qrypta/src/core/data/models/consent_request_model.dart';
+import 'package:qrypta/src/core/error/app_failure.dart';
 import 'package:qrypta/src/core/services/authentication_service.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/btid_provider.dart';
@@ -66,11 +67,11 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
     final cred = ref.read(btidCredentialProvider);
     switch (key) {
       case 'name':
-        return cred?.fullName ?? 'James Wilson';
+        return (cred?.fullName.isNotEmpty == true) ? cred!.fullName : 'Tourist';
       case 'nationality':
-        return '${cred?.nationality ?? "GBR"} (United Kingdom)';
+        return cred?.nationality ?? 'IDN';
       case 'passport_number':
-        return cred?.passportMasked ?? '••••••789';
+        return cred?.passportMasked ?? '••••••';
       case 'identity':
         return 'Verified (On-chain proof)';
       case 'passport_auth':
@@ -78,11 +79,11 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
       case 'id_validity':
         return 'Valid until 18 Jan 2027';
       case 'levy_status':
-        return (cred?.isLevyPaid ?? false) ? 'Paid (LVY-88412)' : 'Unpaid';
+        return (cred?.isLevyPaid ?? false) ? 'Paid (${cred?.levyReceiptRef ?? "LVY"})' : 'Unpaid';
       case 'stay_valid':
-        return 'Valid — ${cred?.daysRemaining ?? 28} days remaining';
+        return 'Valid — ${cred?.daysRemaining ?? 30} days remaining';
       case 'stay_expiry':
-        return cred?.stayExpiry ?? '2026-11-14';
+        return cred?.stayExpiry ?? '';
       case 'over18':
         return 'Over 18 — verified (Zero-Knowledge)';
       case 'over21':
@@ -90,15 +91,15 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
       case 'driving':
         return 'Verified — International Permit Category B';
       case 'dob':
-        return cred?.dob ?? '12 May 1988';
+        return cred?.dob ?? '';
       case 'arrival':
-        return cred?.arrivalDate ?? '2026-10-15';
+        return cred?.arrivalDate ?? '';
       case 'departure':
-        return '2026-11-14';
+        return '';
       case 'visa_type':
-        return cred?.visaType ?? 'e-VOA B1 Visit Visa';
+        return (cred?.visaType.isNotEmpty == true) ? cred!.visaType : 'Tourist Visa';
       case 'emergency':
-        return 'S. Wilson · +44 ••• 4471';
+        return 'Registered Emergency Contact';
       case 'payment_confirm':
         return 'Payment Confirmed';
       default:
@@ -131,21 +132,25 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
       // 2. Ambil private key dari secure storage
       final privateKey = await ref.read(getPrivateKeyUseCaseProvider)();
       if (privateKey == null || privateKey.isEmpty) {
-        throw Exception('Private key not found in secure storage');
+        throw const ValidationFailure('Private key not found in secure storage');
       }
 
       final cred = ref.read(btidCredentialProvider);
+      if (cred == null || cred.btidNumber.isEmpty) {
+        throw const ValidationFailure('Kredensial BTID belum aktif. Selesaikan onboarding terlebih dahulu.');
+      }
+
+      final actor = ref.read(actorRefProvider);
       final approvedMap = <String, dynamic>{
-        'btid': cred?.btidNumber ?? 'BTID-2026-4471-0938',
-        'fullName': cred?.fullName ?? 'James Wilson',
-        'walletAddress': cred?.walletAddress ?? '',
+        'btid': cred.btidNumber,
+        'fullName': cred.fullName.isNotEmpty ? cred.fullName : 'Tourist',
+        'walletAddress': cred.walletAddress,
       };
 
       for (final key in _selectedFields) {
         approvedMap[key] = _resolveAttributeValue(key);
       }
 
-      // Buat request dengan daftar atribut yang benar-benar dicentang oleh user
       final finalRequest = widget.request.copyWith(
         requestedFields: _selectedFields.toList(),
       );
@@ -157,6 +162,7 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
             request: finalRequest,
             approvedData: approvedMap,
             privateKeyHex: privateKey,
+            actor: actor,
           );
 
       if (!mounted) return;
@@ -188,15 +194,18 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
     try {
       final privateKey = await ref.read(getPrivateKeyUseCaseProvider)() ?? '0x0';
       final cred = ref.read(btidCredentialProvider);
+      final actor = ref.read(actorRefProvider);
       final approvedMap = <String, dynamic>{
-        'btid': cred?.btidNumber ?? 'BTID-2026-4471-0938',
-        'fullName': cred?.fullName ?? 'James Wilson',
+        'btid': cred?.btidNumber ?? '',
+        'fullName': (cred?.fullName.isNotEmpty == true) ? cred!.fullName : 'Tourist',
+        'walletAddress': cred?.walletAddress ?? '',
       };
 
       await ref.read(verificationControllerProvider.notifier).rejectConsent(
             request: widget.request,
             approvedData: approvedMap,
             privateKeyHex: privateKey,
+            actor: actor,
           );
 
       if (!mounted) return;

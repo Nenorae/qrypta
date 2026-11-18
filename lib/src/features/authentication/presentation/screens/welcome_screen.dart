@@ -2,10 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
-import 'package:qrypta/src/core/utils/mrz_parser.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/login_screen.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/mrz_scanner_screen.dart';
-import 'package:qrypta/src/features/authentication/presentation/screens/passport_verification_flow_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -220,42 +218,7 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // Tombol Bypass Evaluator / Demo Cepat (1 Klik James Wilson)
-              TextButton(
-                onPressed: () {
-                  final demoResult = MrzParseResult.demoJamesWilson();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => PassportVerificationFlowScreen(
-                        mrzResult: demoResult,
-                      ),
-                    ),
-                  );
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.play_circle_outline_rounded,
-                      size: 16,
-                      color: AppColors.accent.withValues(alpha: 0.8),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Fast Demo Mode (James Wilson)',
-                      style: TextStyle(
-                        color: AppColors.accent.withValues(alpha: 0.8),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 24),
             ],
           ),
         ),

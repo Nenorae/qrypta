@@ -1,6 +1,7 @@
 // lib/src/features/home/presentation/tabs/tab_pay.dart
 
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/qris_payment_screen.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/send_scanner_screen.dart';
@@ -47,7 +48,9 @@ class TabPay extends StatelessWidget {
           return;
         }
       }
-    } catch (_) {}
+    } on Object catch (e) {
+      developer.log('Format JSON QR tidak dikenali: $e', name: 'TabPay');
+    }
 
     // Identifikasi merchant demo
     if (rawData.contains('MCH-3311') || rawData.toLowerCase().contains('coffee')) {

@@ -2,8 +2,10 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qrypta/src/core/data/models/actor_ref.dart';
 import 'package:qrypta/src/core/data/models/audit_transaction_model.dart';
 import 'package:qrypta/src/core/data/models/consent_request_model.dart';
 import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
@@ -102,12 +104,19 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
   void startOrRefreshQr({String? btid, String? walletAddress}) {
     _countdownTimer?.cancel();
 
-    final activeBtid = btid ??
-        ref.read(btidCredentialProvider)?.btidNumber ??
-        'BTID-2026-4471-0938';
-    final activeWallet = walletAddress ??
-        ref.read(btidCredentialProvider)?.walletAddress ??
-        '0x71CB05EE1b1F506fF321Da3CE92a540AC401B4D0';
+    final cred = ref.read(btidCredentialProvider);
+    final activeBtid = btid ?? cred?.btidNumber ?? '';
+    final activeWallet = walletAddress ?? cred?.walletAddress ?? '';
+
+    if (activeBtid.isEmpty || activeWallet.isEmpty) {
+      state = state.copyWith(
+        currentQrToken: '',
+        tokenCode: '',
+        remainingSeconds: 0,
+        isQrExpired: true,
+      );
+      return;
+    }
 
     final jsonPayload = _verificationService.generateDynamicQrToken(
       activeBtid,
@@ -115,11 +124,13 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
       validitySeconds: 45,
     );
 
-    String extractedToken = 'QRT-9X2KL8MPQ1';
+    String extractedToken = 'QRT-0000000000';
     try {
       final decoded = jsonDecode(jsonPayload);
       extractedToken = decoded['token']?.toString() ?? extractedToken;
-    } catch (_) {}
+    } on Object catch (e) {
+      developer.log('Gagal decode payload QR token: $e', name: 'VerificationController');
+    }
 
     state = state.copyWith(
       currentQrToken: jsonPayload,
@@ -179,6 +190,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
     required ConsentRequestModel request,
     required Map<String, dynamic> approvedData,
     required String privateKeyHex,
+    ActorRef? actor,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
@@ -188,6 +200,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
         request: request,
         approvedData: approvedData,
         isApproved: true,
+        actor: actor,
       );
 
       final updatedList = [audit, ...state.auditHistory.where((a) => a.txRef != audit.txRef)];
@@ -209,6 +222,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
     required ConsentRequestModel request,
     required Map<String, dynamic> approvedData,
     required String privateKeyHex,
+    ActorRef? actor,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
@@ -218,6 +232,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
         request: request,
         approvedData: approvedData,
         isApproved: false,
+        actor: actor,
       );
 
       final updatedList = [audit, ...state.auditHistory.where((a) => a.txRef != audit.txRef)];
@@ -241,6 +256,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
     required String privateKeyHex,
     required String btid,
     String? merchantName,
+    ActorRef? actor,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
@@ -251,12 +267,16 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
         merchantId: merchantId,
         btid: btid,
         merchantName: merchantName,
+        actor: actor,
       );
 
-      // Perbarui status record di riwayat audit
       final updatedList = state.auditHistory.map((item) {
         if (item.txRef == txRef || item.organisation == (merchantName ?? merchantId)) {
-          return item.copyWith(status: 'Revoked');
+          return item.copyWith(
+            status: 'Revoked',
+            syncStatus: audit.syncStatus,
+            lastError: audit.lastError,
+          );
         }
         return item;
       }).toList();
@@ -278,7 +298,9 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
     try {
       final list = await _verificationService.getAuditTransactions();
       state = state.copyWith(auditHistory: list);
-    } catch (_) {}
+    } on Object catch (e) {
+      developer.log('Gagal memuat riwayat audit: $e', name: 'VerificationController');
+    }
   }
 
   void clearActiveConsent() {

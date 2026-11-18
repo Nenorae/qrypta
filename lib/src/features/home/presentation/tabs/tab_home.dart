@@ -39,7 +39,7 @@ class TabHome extends ConsumerWidget {
     final verificationState = ref.watch(verificationControllerProvider);
     final tokensAsync = ref.watch(tokenNotifierProvider);
 
-    final fullName = btidCred?.fullName ?? 'James Wilson';
+    final fullName = (btidCred?.fullName.isNotEmpty == true) ? btidCred!.fullName : 'Tourist';
     final firstName = fullName.split(' ').first;
     final isPaid = btidCred?.isLevyPaid ?? false;
     final activeRequest = verificationState.activeConsentRequest;

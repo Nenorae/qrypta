@@ -101,7 +101,7 @@ class BtidCredentialModel {
   factory BtidCredentialModel.fromJson(Map<String, dynamic> json) {
     return BtidCredentialModel(
       btidNumber: json['btidNumber'] as String? ?? 'BTID-2026-4471-0938',
-      fullName: json['fullName'] as String? ?? 'James Wilson',
+      fullName: json['fullName'] as String? ?? 'Tourist',
       nationality: json['nationality'] as String? ?? 'GBR',
       passportMasked: json['passportMasked'] as String? ?? '••••••789',
       dob: json['dob'] as String? ?? '1988-04-12',
@@ -123,7 +123,7 @@ class BtidCredentialModel {
   factory BtidCredentialModel.defaultDemo({String walletAddress = '0x71C...B29'}) {
     return BtidCredentialModel(
       btidNumber: 'BTID-2026-4471-0938',
-      fullName: 'James Wilson',
+      fullName: 'Tourist',
       nationality: 'GBR',
       passportMasked: '••••••789',
       dob: '1988-04-12',

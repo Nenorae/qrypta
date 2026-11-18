@@ -54,14 +54,6 @@ class MrzParseResult {
       isBirthDateValid &&
       isExpiryDateValid &&
       isCompositeValid;
-
-  /// Injeksi data demo resmi James Wilson (sesuai spesifikasi Bali Tourist ID)
-  factory MrzParseResult.demoJamesWilson() {
-    return MrzParser.parse(
-      'P<GBRWILSON<<JAMES<<<<<<<<<<<<<<<<<<<<<<<<<<',
-      '7249187895GBR8805120M3203189<<<<<<<<<<<<<<02',
-    );
-  }
 }
 
 /// Mesin parsing dan validasi Machine Readable Zone (MRZ) ICAO Doc 9303 Part 9 & 10 (Format TD3).

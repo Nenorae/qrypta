@@ -8,35 +8,44 @@ import 'dart:typed_data';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:qrypta/src/core/config/blockchain_config.dart';
+import 'package:qrypta/src/core/data/models/actor_ref.dart';
 import 'package:qrypta/src/core/data/models/audit_transaction_model.dart';
 import 'package:qrypta/src/core/data/models/consent_request_model.dart';
+import 'package:qrypta/src/core/error/app_failure.dart';
+import 'package:qrypta/src/core/error/network_exception_adapter.dart';
+import 'package:qrypta/src/core/outbox/outbox_item.dart';
+import 'package:qrypta/src/core/outbox/outbox_repository.dart';
+import 'package:qrypta/src/core/utils/uuid_util.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
 
 class VerificationTransactionService {
   final Web3Client? _web3Client;
   final http.Client _httpClient;
+  final OutboxRepository _outboxRepository;
   static const String _boxName = 'audit_transactions_box';
   static const String _serviceName = 'VerificationTxService';
 
-  // In-memory fallback if Hive is not yet initialized in tests
   final List<AuditTransactionModel> _memoryAuditCache = [];
 
   VerificationTransactionService([
     this._web3Client,
     http.Client? httpClient,
-  ]) : _httpClient = httpClient ?? http.Client();
+    OutboxRepository? outboxRepository,
+  ])  : _httpClient = httpClient ?? http.Client(),
+        _outboxRepository = outboxRepository ?? OutboxRepository();
 
-  /// Optional Web3Client for on-chain verification checks
   Web3Client? get web3Client => _web3Client;
 
   /// Generates a rotating ephemeral dynamic QR token (strictly 45s validity).
-  /// Format: QRT-<10_ALPHANUMERIC_CHARS> with timestamp expiry and BTID binding.
   String generateDynamicQrToken(
     String btid,
     String walletAddress, {
     int validitySeconds = 45,
   }) {
+    if (btid.isEmpty) {
+      throw const ValidationFailure('BTID tidak boleh kosong saat membuat token QR dinamis.');
+    }
     const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     final random = Random.secure();
     final tokenCode = StringBuffer('QRT-');
@@ -57,20 +66,39 @@ class VerificationTransactionService {
   }
 
   /// Digitally signs canonical consent attributes and submits to ezsign-core Fastify middleware.
-  /// Canonical digest excludes raw PII and anchors only purpose-bound attribute keys and outcome.
+  /// Enforces Golden Rule R1, R2, and R7.
   Future<AuditTransactionModel> signAndSubmitConsent({
     required String privateKeyHex,
     required ConsentRequestModel request,
     required Map<String, dynamic> approvedData,
     required bool isApproved,
+    ActorRef? actor,
   }) async {
     final cleanKey = _cleanHexKey(privateKeyHex);
     final ethKey = EthPrivateKey.fromHex(cleanKey);
     final nowIso = DateTime.now().toUtc().toIso8601String();
     final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    final btid = approvedData['btid']?.toString() ?? 'BTID-2026-4471-0938';
-    final btidHashHex = '0x${bytesToHex(keccak256(utf8.encode(btid)))}';
+    final btid = approvedData['btid']?.toString() ?? '';
+    if (btid.isEmpty) {
+      throw const ValidationFailure('BTID wajib disertakan untuk otorisasi data.');
+    }
+
+    final fullName = approvedData['fullName']?.toString() ?? '';
+    if (fullName.isEmpty) {
+      throw const ValidationFailure('Identitas pemegang BTID wajib disertakan.');
+    }
+
+    final walletAddress = approvedData['walletAddress']?.toString() ?? ethKey.address.hexEip55;
+
+    final resolvedActor = actor ??
+        ActorRef.fromCredential(
+          walletAddress: walletAddress,
+          btidNumber: btid,
+          name: fullName,
+        );
+
+    final btidHashHex = '0x${bytesToHex(keccak256(Uint8List.fromList(utf8.encode(btid))))}';
 
     // 1. Build canonical payload for cryptographic signing (zero raw PII)
     final canonicalPayload = {
@@ -84,7 +112,7 @@ class VerificationTransactionService {
     };
 
     final canonicalJson = jsonEncode(canonicalPayload);
-    final canonicalDigestBytes = keccak256(utf8.encode(canonicalJson));
+    final canonicalDigestBytes = keccak256(Uint8List.fromList(utf8.encode(canonicalJson)));
     final canonicalDigestHex = '0x${bytesToHex(canonicalDigestBytes)}';
 
     // 2. Sign canonical payload using private key
@@ -93,15 +121,10 @@ class VerificationTransactionService {
     );
     final signatureHex = '0x${bytesToHex(signatureBytes)}';
 
-    developer.log(
-      'Signed consent for ${request.requestId} (outcome: ${isApproved ? "APPROVED" : "REJECTED"})',
-      name: _serviceName,
-    );
-
     final auditRef = _generateAuditRef();
-    String txHash = '0x${bytesToHex(canonicalDigestBytes)}';
+    final idempotencyKey = UuidUtil.generateV4();
 
-    // 3. Dispatch to ezsign-core Fastify middleware -> RabbitMQ -> tx-worker -> Besu
+    // 3. Dispatch to ezsign-core Fastify middleware
     final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
     final middlewareBody = {
       'uuid': btid,
@@ -109,7 +132,9 @@ class VerificationTransactionService {
       'signature': signatureHex,
       'docType': 'BTID_CONSENT',
       'metadata': {
-        'actor': approvedData['fullName']?.toString() ?? 'Tourist',
+        'actor': resolvedActor.actorRef,
+        'actorWallet': resolvedActor.walletAddress,
+        'actorRef': resolvedActor.actorRef,
         'org': request.merchantName,
         'role': 'Tourist',
         'action': isApproved ? 'Identity shared with merchant' : 'Identity sharing rejected',
@@ -124,36 +149,88 @@ class VerificationTransactionService {
       'timestamp': nowEpoch,
     };
 
+    String? serverCorrelationId;
+    String? onChainTxHash;
+
     try {
       final response = await _httpClient.post(
         middlewareEndpoint,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: jsonEncode(middlewareBody),
       ).timeout(const Duration(seconds: 5));
 
-      if (response.statusCode == 200 || response.statusCode == 202) {
-        final resJson = jsonDecode(response.body);
-        final returnedId = resJson['correlation_id'] ?? resJson['data']?['txHash'];
-        if (returnedId != null) {
-          txHash = returnedId.toString().startsWith('0x')
-              ? returnedId.toString()
-              : '0x${bytesToHex(keccak256(utf8.encode(returnedId.toString())))}';
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        try {
+          final resJson = jsonDecode(response.body);
+          if (resJson is Map<String, dynamic>) {
+            serverCorrelationId = resJson['correlation_id']?.toString() ??
+                resJson['data']?['txHash']?.toString() ??
+                resJson['id']?.toString();
+            final rawTx = resJson['data']?['txHash'] ?? resJson['txHash'];
+            if (rawTx != null && rawTx.toString().startsWith('0x')) {
+              onChainTxHash = rawTx.toString();
+            }
+          }
+        } on Object catch (e) {
+          developer.log('Respon body non-JSON: $e', name: _serviceName);
         }
+      } else {
+        throw NetworkExceptionAdapter.fromHttpResponse(
+          response.statusCode,
+          response.body,
+        );
       }
-    } catch (e) {
-      // Graceful fallback for offline demo / decoupled execution
-      developer.log(
-        'Fastify middleware unreachable ($middlewareEndpoint): $e. Using local immutable digest.',
-        name: _serviceName,
-      );
+    } on Object catch (e) {
+      if (e is AppFailure) rethrow;
+
+      // Golden Rule R2: Approved TIDAK BOLEH dibuat palsu saat server offline.
+      if (isApproved) {
+        final failure = NetworkExceptionAdapter.fromException(e);
+        developer.log('Fastify middleware unreachable ($middlewareEndpoint): $failure', name: _serviceName);
+        throw failure;
+      } else {
+        // Penolakan (Rejected) dijadwalkan via outbox
+        await _outboxRepository.enqueue(
+          OutboxItem(
+            id: idempotencyKey,
+            type: 'audit_consent',
+            endpoint: '/verify-identity',
+            payload: middlewareBody,
+            nextAttemptAt: DateTime.now().add(const Duration(seconds: 5)),
+            createdAt: DateTime.now(),
+          ),
+        );
+        final rejectedAudit = AuditTransactionModel(
+          auditRef: auditRef,
+          txRef: request.requestId,
+          txHash: null,
+          actor: resolvedActor.name?.isNotEmpty == true ? resolvedActor.name! : resolvedActor.actorRef,
+          organisation: request.merchantName,
+          action: 'Identity sharing rejected',
+          purpose: request.purposeTemplate,
+          sharedAttributesCount: 0,
+          status: 'Rejected',
+          timestamp: DateTime.now(),
+          attributeKeys: request.requestedFields,
+          receiptSignature: signatureHex,
+          syncStatus: 'pending_sync',
+          lastError: 'Server offline, penolakan dijadwalkan via outbox.',
+          actorWallet: resolvedActor.walletAddress,
+          actorRef: resolvedActor.actorRef,
+        );
+        await saveAuditTransaction(rejectedAudit);
+        return rejectedAudit;
+      }
     }
 
-    // 4. Construct Audit Transaction Model and persist locally
     final auditModel = AuditTransactionModel(
       auditRef: auditRef,
       txRef: request.requestId,
-      txHash: txHash,
-      actor: approvedData['fullName']?.toString() ?? 'James Wilson',
+      txHash: onChainTxHash,
+      actor: resolvedActor.name?.isNotEmpty == true ? resolvedActor.name! : resolvedActor.actorRef,
       organisation: request.merchantName,
       action: isApproved ? 'Identity shared with merchant' : 'Identity sharing rejected',
       purpose: request.purposeTemplate,
@@ -162,6 +239,10 @@ class VerificationTransactionService {
       timestamp: DateTime.now(),
       attributeKeys: request.requestedFields,
       receiptSignature: signatureHex,
+      syncStatus: 'synced',
+      serverId: serverCorrelationId,
+      actorWallet: resolvedActor.walletAddress,
+      actorRef: resolvedActor.actorRef,
     );
 
     await saveAuditTransaction(auditModel);
@@ -169,17 +250,29 @@ class VerificationTransactionService {
   }
 
   /// Signs and submits a revocation request for a merchant's access.
+  /// If server is unreachable, queues in outbox and marks status with explicit pending warning (R7).
   Future<AuditTransactionModel> revokeMerchantAccess({
     required String privateKeyHex,
     required String txRef,
     required String merchantId,
     required String btid,
     String? merchantName,
+    ActorRef? actor,
   }) async {
     final cleanKey = _cleanHexKey(privateKeyHex);
     final ethKey = EthPrivateKey.fromHex(cleanKey);
     final nowIso = DateTime.now().toUtc().toIso8601String();
     final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    if (btid.isEmpty) {
+      throw const ValidationFailure('BTID wajib disertakan untuk pencabutan akses.');
+    }
+
+    final resolvedActor = actor ??
+        ActorRef.fromCredential(
+          walletAddress: ethKey.address.hexEip55,
+          btidNumber: btid,
+        );
 
     final revokePayload = {
       'txRef': txRef,
@@ -196,7 +289,7 @@ class VerificationTransactionService {
     final signatureHex = '0x${bytesToHex(signatureBytes)}';
 
     final auditRef = _generateAuditRef();
-    String txHash = '0x${bytesToHex(keccak256(utf8.encode(payloadJson)))}';
+    final idempotencyKey = UuidUtil.generateV4();
 
     final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
     final middlewareBody = {
@@ -205,7 +298,9 @@ class VerificationTransactionService {
       'signature': signatureHex,
       'docType': 'BTID_REVOKE',
       'metadata': {
-        'actor': 'Tourist',
+        'actor': resolvedActor.actorRef,
+        'actorWallet': resolvedActor.walletAddress,
+        'actorRef': resolvedActor.actorRef,
         'org': merchantName ?? merchantId,
         'role': 'Tourist',
         'action': 'Merchant access revoked',
@@ -217,21 +312,58 @@ class VerificationTransactionService {
       'timestamp': nowEpoch,
     };
 
+    String syncStatus = 'synced';
+    String? serverCorrelationId;
+    String? lastError;
+
     try {
-      await _httpClient.post(
+      final response = await _httpClient.post(
         middlewareEndpoint,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: jsonEncode(middlewareBody),
       ).timeout(const Duration(seconds: 5));
-    } catch (e) {
-      developer.log('Revocation submit offline fallback: $e', name: _serviceName);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        try {
+          final resJson = jsonDecode(response.body);
+          if (resJson is Map<String, dynamic>) {
+            serverCorrelationId = resJson['correlation_id']?.toString() ??
+                resJson['data']?['txHash']?.toString();
+          }
+        } on Object catch (e) {
+          developer.log('Respon body non-JSON: $e', name: _serviceName);
+        }
+      } else {
+        throw NetworkExceptionAdapter.fromHttpResponse(
+          response.statusCode,
+          response.body,
+        );
+      }
+    } on Object catch (e) {
+      developer.log('Pencabutan akses server gagal, dialihkan ke outbox: $e', name: _serviceName);
+      syncStatus = 'pending_sync';
+      lastError = 'Pencabutan belum terkirim ke server. Merchant mungkin masih memiliki akses.';
+
+      await _outboxRepository.enqueue(
+        OutboxItem(
+          id: idempotencyKey,
+          type: 'audit_revocation',
+          endpoint: '/verify-identity',
+          payload: middlewareBody,
+          nextAttemptAt: DateTime.now().add(const Duration(seconds: 5)),
+          createdAt: DateTime.now(),
+        ),
+      );
     }
 
     final auditModel = AuditTransactionModel(
       auditRef: auditRef,
       txRef: txRef,
-      txHash: txHash,
-      actor: 'James Wilson',
+      txHash: null,
+      actor: resolvedActor.name?.isNotEmpty == true ? resolvedActor.name! : resolvedActor.actorRef,
       organisation: merchantName ?? merchantId,
       action: 'Merchant access revoked',
       purpose: 'Revoke future access',
@@ -239,6 +371,11 @@ class VerificationTransactionService {
       status: 'Revoked',
       timestamp: DateTime.now(),
       receiptSignature: signatureHex,
+      syncStatus: syncStatus,
+      serverId: serverCorrelationId,
+      lastError: lastError,
+      actorWallet: resolvedActor.walletAddress,
+      actorRef: resolvedActor.actorRef,
     );
 
     await saveAuditTransaction(auditModel);
@@ -252,9 +389,17 @@ class VerificationTransactionService {
     required String btid,
     required String amountFormatted,
     required String walletAddress,
+    ActorRef? actor,
   }) async {
     final auditRef = _generateAuditRef();
     final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final idempotencyKey = UuidUtil.generateV4();
+
+    final resolvedActor = actor ??
+        ActorRef.fromCredential(
+          walletAddress: walletAddress,
+          btidNumber: btid,
+        );
 
     final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
     final middlewareBody = {
@@ -263,7 +408,9 @@ class VerificationTransactionService {
       'signature': '0x',
       'docType': 'BTID_LEVY_PAYMENT',
       'metadata': {
-        'actor': 'James Wilson',
+        'actor': resolvedActor.actorRef,
+        'actorWallet': resolvedActor.walletAddress,
+        'actorRef': resolvedActor.actorRef,
         'org': 'Bali Tourism Authority (Bapenda)',
         'role': 'Tourist',
         'action': 'Tourist Levy paid ($amountFormatted)',
@@ -278,27 +425,69 @@ class VerificationTransactionService {
       'timestamp': nowEpoch,
     };
 
+    String syncStatus = 'synced';
+    String? serverCorrelationId;
+    String? lastError;
+
     try {
-      await _httpClient.post(
+      final response = await _httpClient.post(
         middlewareEndpoint,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: jsonEncode(middlewareBody),
       ).timeout(const Duration(seconds: 5));
-    } catch (e) {
-      developer.log('Levy payment audit submit fallback: $e', name: _serviceName);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        try {
+          final resJson = jsonDecode(response.body);
+          if (resJson is Map<String, dynamic>) {
+            serverCorrelationId = resJson['correlation_id']?.toString() ??
+                resJson['data']?['txHash']?.toString();
+          }
+        } on Object catch (e) {
+          developer.log('Respon body non-JSON: $e', name: _serviceName);
+        }
+      } else {
+        throw NetworkExceptionAdapter.fromHttpResponse(
+          response.statusCode,
+          response.body,
+        );
+      }
+    } on Object catch (e) {
+      developer.log('Pencatatan audit levy server tertunda, dialihkan ke outbox: $e', name: _serviceName);
+      syncStatus = 'pending_sync';
+      lastError = 'Audit server tertunda. Transaksi on-chain tetap sah.';
+
+      await _outboxRepository.enqueue(
+        OutboxItem(
+          id: idempotencyKey,
+          type: 'audit_levy',
+          endpoint: '/verify-identity',
+          payload: middlewareBody,
+          nextAttemptAt: DateTime.now().add(const Duration(seconds: 5)),
+          createdAt: DateTime.now(),
+        ),
+      );
     }
 
     final audit = AuditTransactionModel(
       auditRef: auditRef,
       txRef: levyRef,
       txHash: txHash,
-      actor: 'James Wilson',
+      actor: resolvedActor.name?.isNotEmpty == true ? resolvedActor.name! : resolvedActor.actorRef,
       organisation: 'Bali Tourism Authority (Bapenda)',
       action: 'Tourist Levy paid ($amountFormatted)',
       purpose: 'Official Bali Tourist Levy',
       sharedAttributesCount: 0,
       status: 'Paid',
       timestamp: DateTime.now(),
+      syncStatus: syncStatus,
+      serverId: serverCorrelationId,
+      lastError: lastError,
+      actorWallet: resolvedActor.walletAddress,
+      actorRef: resolvedActor.actorRef,
     );
 
     await saveAuditTransaction(audit);
@@ -314,9 +503,16 @@ class VerificationTransactionService {
     required String amountFormatted,
     required String walletAddress,
     String? itemDescription,
+    ActorRef? actor,
   }) async {
     final auditRef = _generateAuditRef();
     final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final idempotencyKey = UuidUtil.generateV4();
+
+    final resolvedActor = actor ??
+        ActorRef.fromWallet(
+          walletAddress: walletAddress,
+        );
 
     final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
     final middlewareBody = {
@@ -325,7 +521,9 @@ class VerificationTransactionService {
       'signature': '0x',
       'docType': 'BTID_QRIS_PAYMENT',
       'metadata': {
-        'actor': 'James Wilson',
+        'actor': resolvedActor.actorRef,
+        'actorWallet': resolvedActor.walletAddress,
+        'actorRef': resolvedActor.actorRef,
         'org': merchantName,
         'role': 'Customer',
         'action': 'QRIS Merchant Payment ($amountFormatted)',
@@ -343,27 +541,69 @@ class VerificationTransactionService {
       'timestamp': nowEpoch,
     };
 
+    String syncStatus = 'synced';
+    String? serverCorrelationId;
+    String? lastError;
+
     try {
-      await _httpClient.post(
+      final response = await _httpClient.post(
         middlewareEndpoint,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: jsonEncode(middlewareBody),
       ).timeout(const Duration(seconds: 5));
-    } catch (e) {
-      developer.log('QRIS payment audit submit fallback: $e', name: _serviceName);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        try {
+          final resJson = jsonDecode(response.body);
+          if (resJson is Map<String, dynamic>) {
+            serverCorrelationId = resJson['correlation_id']?.toString() ??
+                resJson['data']?['txHash']?.toString();
+          }
+        } on Object catch (e) {
+          developer.log('Respon body non-JSON: $e', name: _serviceName);
+        }
+      } else {
+        throw NetworkExceptionAdapter.fromHttpResponse(
+          response.statusCode,
+          response.body,
+        );
+      }
+    } on Object catch (e) {
+      developer.log('Pencatatan audit QRIS server tertunda, dialihkan ke outbox: $e', name: _serviceName);
+      syncStatus = 'pending_sync';
+      lastError = 'Audit server tertunda. Transaksi on-chain tetap sah.';
+
+      await _outboxRepository.enqueue(
+        OutboxItem(
+          id: idempotencyKey,
+          type: 'audit_qris',
+          endpoint: '/verify-identity',
+          payload: middlewareBody,
+          nextAttemptAt: DateTime.now().add(const Duration(seconds: 5)),
+          createdAt: DateTime.now(),
+        ),
+      );
     }
 
     final audit = AuditTransactionModel(
       auditRef: auditRef,
       txRef: payRef,
       txHash: txHash,
-      actor: 'James Wilson',
+      actor: resolvedActor.name?.isNotEmpty == true ? resolvedActor.name! : resolvedActor.actorRef,
       organisation: merchantName,
       action: 'QRIS Payment ($amountFormatted)',
       purpose: 'Payment Settlement',
       sharedAttributesCount: 0,
       status: 'Paid',
       timestamp: DateTime.now(),
+      syncStatus: syncStatus,
+      serverId: serverCorrelationId,
+      lastError: lastError,
+      actorWallet: resolvedActor.walletAddress,
+      actorRef: resolvedActor.actorRef,
     );
 
     await saveAuditTransaction(audit);
@@ -377,9 +617,14 @@ class VerificationTransactionService {
     required String walletAddress,
   }) async {
     final auditRef = _generateAuditRef();
-    final nowIso = DateTime.now().toUtc().toIso8601String();
     final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final txHash = '0x${bytesToHex(keccak256(utf8.encode("$btid-$walletAddress-$nowIso")))}';
+    final idempotencyKey = UuidUtil.generateV4();
+
+    final actorRef = ActorRef.fromCredential(
+      walletAddress: walletAddress,
+      btidNumber: btid,
+      name: fullName,
+    );
 
     final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
     final middlewareBody = {
@@ -389,6 +634,8 @@ class VerificationTransactionService {
       'docType': 'BTID_ISSUED',
       'metadata': {
         'actor': 'System (Bali Tourism Authority)',
+        'actorWallet': walletAddress,
+        'actorRef': actorRef.actorRef,
         'org': 'Bali Tourism Authority & Immigration',
         'role': 'Issuer',
         'action': 'Credential issued',
@@ -401,20 +648,62 @@ class VerificationTransactionService {
       'timestamp': nowEpoch,
     };
 
+    String syncStatus = 'synced';
+    String? serverCorrelationId;
+    String? anchorTxHash;
+    String? lastError;
+
     try {
-      await _httpClient.post(
+      final response = await _httpClient.post(
         middlewareEndpoint,
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
         body: jsonEncode(middlewareBody),
       ).timeout(const Duration(seconds: 5));
-    } catch (e) {
-      developer.log('Credential issued audit submit fallback: $e', name: _serviceName);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        try {
+          final resJson = jsonDecode(response.body);
+          if (resJson is Map<String, dynamic>) {
+            serverCorrelationId = resJson['correlation_id']?.toString() ??
+                resJson['data']?['txHash']?.toString();
+            final rawTx = resJson['data']?['txHash'] ?? resJson['txHash'];
+            if (rawTx != null && rawTx.toString().startsWith('0x')) {
+              anchorTxHash = rawTx.toString();
+            }
+          }
+        } on Object catch (e) {
+          developer.log('Respon body non-JSON: $e', name: _serviceName);
+        }
+      } else {
+        throw NetworkExceptionAdapter.fromHttpResponse(
+          response.statusCode,
+          response.body,
+        );
+      }
+    } on Object catch (e) {
+      developer.log('Penerbitan audit kredensial dialihkan ke outbox: $e', name: _serviceName);
+      syncStatus = 'pending_sync';
+      lastError = 'Audit kredensial server tertunda.';
+
+      await _outboxRepository.enqueue(
+        OutboxItem(
+          id: idempotencyKey,
+          type: 'audit_credential',
+          endpoint: '/verify-identity',
+          payload: middlewareBody,
+          nextAttemptAt: DateTime.now().add(const Duration(seconds: 5)),
+          createdAt: DateTime.now(),
+        ),
+      );
     }
 
     final audit = AuditTransactionModel(
       auditRef: auditRef,
       txRef: btid,
-      txHash: txHash,
+      txHash: anchorTxHash,
       actor: fullName,
       organisation: 'Bali Tourism Authority & Immigration',
       action: 'Credential issued',
@@ -422,6 +711,12 @@ class VerificationTransactionService {
       sharedAttributesCount: 0,
       status: 'Approved',
       timestamp: DateTime.now(),
+      syncStatus: syncStatus,
+      serverId: serverCorrelationId,
+      anchorTxHash: anchorTxHash,
+      lastError: lastError,
+      actorWallet: walletAddress,
+      actorRef: actorRef.actorRef,
     );
 
     await saveAuditTransaction(audit);
@@ -477,12 +772,10 @@ class VerificationTransactionService {
       results.addAll(_memoryAuditCache);
     }
 
-    // Sort descending by timestamp
     results.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return results;
   }
 
-  // Helper utilities
   static String _cleanHexKey(String key) {
     var k = key.trim();
     if (k.startsWith('0x') || k.startsWith('0X')) {

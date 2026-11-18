@@ -55,23 +55,6 @@ class _MrzScannerScreenState extends State<MrzScannerScreen>
     super.dispose();
   }
 
-  void _injectDemoPassport() {
-    setState(() {
-      _isProcessing = true;
-    });
-
-    // Injeksi data resmi James Wilson
-    final demoResult = MrzParseResult.demoJamesWilson();
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (!mounted) return;
-      setState(() {
-        _isProcessing = false;
-        _detectedResult = demoResult;
-      });
-      _showDetectedResultModal(demoResult);
-    });
-  }
-
   void _onBarcodesDetected(BarcodeCapture capture) {
     if (_isProcessing || _detectedResult != null) return;
 
@@ -456,32 +439,6 @@ class _MrzScannerScreenState extends State<MrzScannerScreen>
                   padding: const EdgeInsets.all(24.0),
                   child: Column(
                     children: [
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: _injectDemoPassport,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E293B),
-                            foregroundColor: Colors.white,
-                            side: BorderSide(
-                              color: AppColors.accent.withValues(alpha: 0.5),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          icon: const Icon(Icons.fingerprint_rounded, color: AppColors.accent),
-                          label: const Text(
-                            'Use Demo Passport (James Wilson)',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

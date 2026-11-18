@@ -2,6 +2,8 @@
 
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart' as http_testing;
 import 'package:qrypta/src/core/data/models/audit_transaction_model.dart';
 import 'package:qrypta/src/core/data/models/consent_request_model.dart';
 import 'package:qrypta/src/core/services/blockchain/verification_transaction_service.dart';
@@ -111,8 +113,25 @@ void main() {
   });
 
   group('Milestone 4 - Cryptographic Consent & Revocation Tests', () {
+    http.Client createMockFastifyClient() {
+      return http_testing.MockClient((req) async {
+        if (req.url.path.contains('verify-identity')) {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'status': 'ACCEPTED',
+              'correlation_id': '0xmockedbesutransactionhash1234567890abcdef',
+            }),
+            202,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+    }
+
     test('signAndSubmitConsent produces valid secp256k1 signature and canonical audit', () async {
-      final service = VerificationTransactionService();
+      final service = VerificationTransactionService(null, createMockFastifyClient());
       final request = ConsentRequestModel(
         requestId: 'TX-448102',
         merchantId: 'MCH-1042',
@@ -154,7 +173,7 @@ void main() {
     });
 
     test('signAndSubmitConsent records rejection with 0 shared attributes', () async {
-      final service = VerificationTransactionService();
+      final service = VerificationTransactionService(null, createMockFastifyClient());
       final request = ConsentRequestModel(
         requestId: 'TX-991204',
         merchantId: 'MCH-3311',
@@ -181,7 +200,7 @@ void main() {
     });
 
     test('revokeMerchantAccess successfully marks audit record as Revoked', () async {
-      final service = VerificationTransactionService();
+      final service = VerificationTransactionService(null, createMockFastifyClient());
       final revokedAudit = await service.revokeMerchantAccess(
         privateKeyHex: testPrivateKeyHex,
         txRef: 'TX-448102',

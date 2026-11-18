@@ -1,5 +1,6 @@
 
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/send_screen.dart';
@@ -73,7 +74,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           return;
         }
       }
-    } catch (_) {}
+    } on Object catch (e) {
+      developer.log('Format JSON QR tidak dikenali: $e', name: 'QrScannerScreen');
+    }
 
     // Check by known merchant identifiers
     if (rawData.contains('MCH-3311') || rawData.toLowerCase().contains('coffee')) {

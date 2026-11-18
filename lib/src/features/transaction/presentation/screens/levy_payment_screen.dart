@@ -28,7 +28,7 @@ class _LevyPaymentScreenState extends ConsumerState<LevyPaymentScreen> {
     final tokensAsync = ref.watch(tokenNotifierProvider);
 
     final isPaid = btidCred?.isLevyPaid ?? false;
-    final fullName = btidCred?.fullName ?? 'James Wilson';
+    final fullName = (btidCred?.fullName.isNotEmpty == true) ? btidCred!.fullName : 'Tourist';
     final passportMasked = btidCred?.passportMasked ?? '••••••789';
     final btidNumber = btidCred?.btidNumber ?? 'BTID-2026-4471-0938';
 
@@ -505,6 +505,7 @@ class _LevyPaymentScreenState extends ConsumerState<LevyPaymentScreen> {
   }
 
   Widget _buildPaidAction(dynamic btidCred) {
+    final paymentState = ref.watch(paymentControllerProvider);
     return Column(
       children: [
         SizedBox(

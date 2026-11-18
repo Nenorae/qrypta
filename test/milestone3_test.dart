@@ -1,9 +1,13 @@
 // test/milestone3_test.dart
 
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart' as http_testing;
 import 'package:qrypta/src/core/data/models/btid_credential_model.dart';
 import 'package:qrypta/src/core/services/blockchain/verification_transaction_service.dart';
 import 'package:qrypta/src/core/utils/mrz_parser.dart';
+import 'fixtures/mrz_fixtures.dart';
 
 void main() {
   group('Milestone 3 - MRZ TD3 Checksum & Parser Unit Tests', () {
@@ -79,7 +83,7 @@ Random noise OCR text below
     });
 
     test('demoJamesWilson factory produces verified credential data', () {
-      final demo = MrzParseResult.demoJamesWilson();
+      final demo = MrzFixtures.demoJamesWilson();
 
       expect(demo.fullName, 'JAMES WILSON');
       expect(demo.nationality, 'GBR');
@@ -116,7 +120,19 @@ Random noise OCR text below
     });
 
     test('VerificationTransactionService records credential issued audit', () async {
-      final service = VerificationTransactionService();
+      final mockClient = http_testing.MockClient((req) async {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'status': 'ISSUED',
+            'correlation_id': '0xissuedcorrelationid1234567890abcdef',
+            'data': {'txHash': '0xanchorhash1234567890abcdef'},
+          }),
+          202,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final service = VerificationTransactionService(null, mockClient);
       final audit = await service.recordCredentialIssuedAudit(
         btid: 'BTID-2026-4471-0938',
         fullName: 'James Wilson',

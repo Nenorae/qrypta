@@ -15,7 +15,7 @@
 | **Phase 1** | **Konfigurasi Dinamis & Sanitasi Jaringan (.env & Dart loopback)** | **3-4 h** | **✅ Selesai** | **F-02, F-20 tuntas: AppConfig compile-time defines, ConfigValidator (R5), NetworkHealthService, permission manifest.** |
 | **Phase 2** | **Fondasi Arsitektur (AppFailure, Tx State Machine, Hive Outbox)** | **3 h** | **✅ Selesai** | **AppFailure taxonomy, TxStateMachine & TxRecovery, Hive OutboxWorker idempoten, AuditMigrationService.** |
 | **Phase 3** | **Transaksi Finansial Nyata (Tourist Levy ERC-20 & QRIS IDRT)** | **5-6 h** | **✅ Selesai** | **F-03, F-03b, F-04, F-09, F-09b, F-10, F-10b tuntas: eliminasi fallback hash, single-source idrtBalanceProvider.** |
-| Phase 4 | Consent, Revocation & Financial Audit Nyata | 5 h | ⬜ Belum | F-05, F-06, F-07, F-12, F-12b, sanitasi 'James Wilson'. |
+| **Phase 4** | **Consent, Revocation & Financial Audit Nyata** | **5 h** | **✅ Selesai** | **F-05, F-06, F-07, F-12, F-12b, F-21 tuntas: outbox offline queue, zero-PII ActorRef, sanitasi James Wilson & catch kosong.** |
 | Phase 5A | Mesin OCR MRZ Paspor Nyata (Google ML Kit Text Recognition) | 6-8 h | ⬜ Belum | F-01, F-19 (eliminasi MobileScanner & bypass demo). |
 | Phase 5B | Penerbitan BTID Otoritatif & Sanitasi Data Identitas | 4 h | ⬜ Belum | F-08, F-11, F-11b, F-13, F-13b (eliminasi BTID/DOB statis). |
 | Phase 6 | Parser Standar QRIS EMVCo TLV & Validasi CRC16-CCITT | 4-5 h | ⬜ Belum | F-14, F-14b (eliminasi string match coffee/tour). |
@@ -38,9 +38,9 @@
 | **F-03** | Fallback hash keccak256 palsu saat pembayaran Tourist Levy via wallet gagal | Kritis | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `payment_controller.dart`. Transaksi wajib on-chain dengan receipt status 1. | 2026-11-18 |
 | **F-03b** | Jalur Visa/Counter QR di `payment_controller.dart` juga memproduksi hash keccak256 palsu | Kritis | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `payment_controller.dart`. Metode non-wallet ditolak via ValidationFailure. | 2026-11-18 |
 | **F-04** | Fallback hash keccak256 palsu saat pembayaran QRIS merchant via wallet gagal | Kritis | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `payment_controller.dart`. Intent dikelola TxStateMachine dan diverifikasi on-chain. | 2026-11-18 |
-| **F-05** | Consent submit ditelan `catch`, otomatis disimpan status "Approved" lokal | Tinggi | 4 | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:143-161`. | 2026-11-17 |
-| **F-06** | Revocation akses ditelan `catch`, otomatis disimpan status "Revoked" lokal | Tinggi | 4 | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:226-239`. | 2026-11-17 |
-| **F-07** | Audit finansial levy & QRIS ditelan `catch` hanya dengan `developer.log` | Tinggi | 4 | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:287,352`. | 2026-11-17 |
+| **F-05** | Consent submit ditelan `catch`, otomatis disimpan status "Approved" lokal | Tinggi | 4 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `verification_transaction_service.dart`. Approval wajib ack 2xx Fastify, error dilempar sebagai AppFailure. | 2026-11-18 |
+| **F-06** | Revocation akses ditelan `catch`, otomatis disimpan status "Revoked" lokal | Tinggi | 4 | ✅ Selesai | Branch `fix/real-behavior` | Pencabutan dialihkan ke Outbox saat offline dengan status pending_sync dan peringatan merchant access jelas. | 2026-11-18 |
+| **F-07** | Audit finansial levy & QRIS ditelan `catch` hanya dengan `developer.log` | Tinggi | 4 | ✅ Selesai | Branch `fix/real-behavior` | Audit levy & QRIS dialihkan ke Outbox saat offline dengan status pending_sync (R7). | 2026-11-18 |
 | **F-08** | Audit penerbitan BTID ditelan `catch`, kartu tetap terbit dengan hash keccak palsu | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:382,410`. | 2026-11-17 |
 | **F-09** | Saldo default `Rp 2.480.000` di `levy_payment_screen.dart` | Tinggi | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi, bermigrasi ke single-source idrtBalanceFormattedProvider. | 2026-11-18 |
 | **F-09b** | Saldo default `Rp 2.480.000` di `tab_home.dart` dan `qris_payment_screen.dart` | Tinggi | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari seluruh file, nol hit grep di seluruh repo. | 2026-11-18 |
@@ -48,8 +48,8 @@
 | **F-10b** | Hash statis kuitansi `0x7b2f8a1e...` di `tab_home.dart` dan `tab_profile.dart` | Sedang | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari dashboard dan profil, nol hit grep di seluruh repo. | 2026-11-18 |
 | **F-11** | Nomor BTID statis `BTID-2026-4471-0938` di `btid_issued_screen.dart` | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `btid_issued_screen.dart:66`. | 2026-11-17 |
 | **F-11b** | Nomor BTID statis tersebar di 8 file tambahan (model deserializer, controller, screens) | Tinggi | 5B | ⬜ Belum | - | Terverifikasi 14 hit di 10 file (termasuk `btid_credential_model.dart:98,119`). | 2026-11-17 |
-| **F-12** | Actor `James Wilson` di 5 lokasi service audit | Tinggi | 4/5B | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:234,266,295,328,360`. | 2026-11-17 |
-| **F-12b** | `James Wilson` tertanam di DTO model, factory MRZ parser, dan UI screens | Tinggi | 5B | ⬜ Belum | - | Terverifikasi 23 hit di 10 file (`btid_credential_model.dart`, `mrz_parser.dart`, dll). | 2026-11-17 |
+| **F-12** | Actor `James Wilson` di 5 lokasi service audit | Tinggi | 4/5B | ✅ Selesai | Branch `fix/real-behavior` | ActorRef salted hash (zero-PII D-8) menggantikan literal James Wilson di seluruh service audit. | 2026-11-18 |
+| **F-12b** | `James Wilson` tertanam di DTO model, factory MRZ parser, dan UI screens | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | James Wilson dieliminasi 100% dari seluruh `lib/` (grep: 0 hit). demoJamesWilson dipindah ke test/fixtures/. | 2026-11-18 |
 | **F-13** | Default imigrasi (DOB, expiry, visaType) di `btid_issued_screen.dart` | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `btid_issued_screen.dart:72-76`. | 2026-11-17 |
 | **F-13b** | Default imigrasi (`1988-04-12`, `2031-08-15`, `e-VOA B1`) tertanam di DTO model | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `btid_credential_model.dart:102-104,123-125`. | 2026-11-17 |
 | **F-14** | Parser QRIS EMVCo TLV tidak ada; string match 'coffee'/'tour'/MCH di `tab_pay.dart` | Tinggi | 6 | ⬜ Belum | - | Terverifikasi di `tab_pay.dart:25,53,69`. | 2026-11-17 |
@@ -61,7 +61,7 @@
 | **F-18** | Liveness wajah dummy skor 98.7% tanpa label simulasi | Rendah | 9 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:790` (MATCH SCORE: 98.7%). | 2026-11-17 |
 | **F-19** | Tombol "Fast Demo Mode" di welcome screen & factory `demoJamesWilson()` di `lib/` | Kritis | 0/5A | ⬜ Belum | - | Terverifikasi di `welcome_screen.dart:225-248` & `mrz_parser.dart:58`. | 2026-11-17 |
 | **F-20** | Alamat loopback `127.0.0.1` hardcoded langsung di kode Dart (bukan hanya .env) | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `blockchain_config.dart`, `graphql_provider.dart`, `payment_controller.dart`. Check 7 Reality Guard lolos hijau. | 2026-11-17 |
-| **F-21** | Blok `catch (_) {}` kosong total tanpa logging ditemukan di 14 titik | Tinggi | 2/3/4 | 🔄 Parsial | Branch `fix/real-behavior` | Core services di Phase 2 disanitasi: `transaction_service.dart:253`, `verification_transaction_service.dart:441,471` bebas dari catch kosong. | 2026-11-18 |
+| **F-21** | Blok `catch (_) {}` kosong total tanpa logging ditemukan di 14 titik | Tinggi | 2/3/4 | ✅ Selesai | Branch `fix/real-behavior` | Seluruh blok catch kosong di `lib/` telah disanitasi 100% (grep: 0 hit). Check Reality Guard hijau. | 2026-11-18 |
 | **F-22** | Android Manifest tidak mendeklarasikan izin `CAMERA` & `NFC` di manifest utama | Tinggi | 1/5A/8 | 🔄 Parsial (Manifest) | Branch `fix/real-behavior` | Izin `CAMERA` & `NFC` ditambahkan ke `AndroidManifest.xml` utama; security config cleartext debug ditambahkan. | 2026-11-17 |
 | **F-23** | Dependensi `camera` tidak terpasang di `pubspec.yaml` untuk frame OCR ML Kit | Kritis | 5A | ⬜ Belum | - | Terverifikasi di `pubspec.lock`: `camera: NOT INSTALLED`. | 2026-11-17 |
 | **F-24** | Tombol quick test di `send_scanner_screen.dart` memuat fixture JSON merchant statis | Sedang | 6 | ⬜ Belum | - | Terverifikasi di `send_scanner_screen.dart:143,186`. | 2026-11-17 |
@@ -107,3 +107,13 @@
 - **Sanitasi Silent Catch (F-21):** Mengeliminasi 6 blok `catch (_) {}` kosong di `payment_controller.dart` dan 3 blok di `btid_provider.dart`.
 - **Pengujian Unit L1:** Dibuat 9 pengujian unit baru di `test/phase3_financial_transaction_test.dart`. Total pengujian aktif seluruh proyek kini **84/84 lulus 100%**.
 - **Status Akhir Phase 3:** Selesai 100%. Siap melangkah ke Phase 4 (Consent, Revocation & Financial Audit).
+
+### 18 November 2026 - Phase 4 Execution
+- **Eliminasi Fallback Palsu Consent Submission (F-05):** Menghapus penelanan error pada blok catch `signAndSubmitConsent`. Persetujuan consent kini wajib mendapatkan konfirmasi 2xx dari Fastify middleware `ezsign-core` dan menyertakan header `Idempotency-Key`. Jika server gagal, transaksi melempar `AppFailure` bertipe tanpa membuat status Approved palsu lokal.
+- **Eliminasi Fallback Palsu Revocation (F-06):** Mengintegrasikan `revokeMerchantAccess` dengan `OutboxRepository`. Pada kondisi offline, rekaman ditandai `pending_sync` disertai peringatan akses merchant, dan dijadwalkan untuk dikirim ulang via `OutboxWorker`.
+- **Eliminasi Penelanan Error Audit Finansial (F-07):** Mengintegrasikan `recordLevyPaymentAudit` dan `recordQrisPaymentAudit` dengan antrean Outbox saat server offline dengan status `pending_sync` (R7) tanpa memalsukan status `synced`.
+- **Sanitasi Aktor & Privasi Zero-PII (F-12 & F-12b):** Mengimplementasikan model `ActorRef` dengan hash kriptografi bergaram (D-8). Menghapus seluruh kemunculan literal `'James Wilson'` di seluruh basis kode `lib/` (0 hit). Memindahkan `demoJamesWilson()` ke fixture pengujian dan menghapus tombol fast demo bypass dari `welcome_screen.dart` dan `mrz_scanner_screen.dart`.
+- **Sanitasi Silent Catch (F-21):** Mengeliminasi 100% blok `catch (_) {}` kosong di `lib/` (`verification_controller.dart`, `tab_pay.dart`, `qr_scanner_screen.dart`). Check Reality Guard untuk catch kosong kini berstatus HIJAU.
+- **UI Status Sinkronisasi & Sync Center (Phase 4.5):** Menambahkan chip visual status sinkronisasi (`Synced`, `Menunggu Sinkron`, `Ditolak Server`, `Tidak Terverifikasi`), kotak detail error/peringatan, dan antarmuka `Sync Center` interaktif dengan tombol "Kirim Ulang Sekarang" di `privacy_audit_screen.dart`.
+- **Pengujian Unit L1:** Dibuat 12 pengujian unit baru di `test/phase4_consent_audit_test.dart`. Total pengujian aktif seluruh proyek kini **96/96 lulus 100% (0 failed)**.
+- **Status Akhir Phase 4:** Selesai 100%. Siap melangkah ke Phase 5A (Mesin OCR MRZ Paspor Asli).

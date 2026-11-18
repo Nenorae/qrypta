@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
+import 'package:qrypta/src/core/data/models/actor_ref.dart';
 import 'package:qrypta/src/core/data/models/btid_credential_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,6 +15,19 @@ final btidCredentialProvider =
     StateNotifierProvider<BtidCredentialNotifier, BtidCredentialModel?>((ref) {
   return BtidCredentialNotifier();
 });
+
+/// Provider referensi aktor zero-PII untuk audit (Phase 4.4).
+final actorRefProvider = Provider<ActorRef?>((ref) {
+  final cred = ref.watch(btidCredentialProvider);
+  if (cred == null || cred.walletAddress.isEmpty) return null;
+  return ActorRef.fromCredential(
+    walletAddress: cred.walletAddress,
+    btidNumber: cred.btidNumber,
+    name: cred.fullName,
+  );
+});
+
+final holderProfileProvider = actorRefProvider;
 
 class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
   BtidCredentialNotifier() : super(null) {
