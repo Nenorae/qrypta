@@ -16,7 +16,7 @@
 | **Phase 2** | **Fondasi Arsitektur (AppFailure, Tx State Machine, Hive Outbox)** | **3 h** | **✅ Selesai** | **AppFailure taxonomy, TxStateMachine & TxRecovery, Hive OutboxWorker idempoten, AuditMigrationService.** |
 | **Phase 3** | **Transaksi Finansial Nyata (Tourist Levy ERC-20 & QRIS IDRT)** | **5-6 h** | **✅ Selesai** | **F-03, F-03b, F-04, F-09, F-09b, F-10, F-10b tuntas: eliminasi fallback hash, single-source idrtBalanceProvider.** |
 | **Phase 4** | **Consent, Revocation & Financial Audit Nyata** | **5 h** | **✅ Selesai** | **F-05, F-06, F-07, F-12, F-12b, F-21 tuntas: outbox offline queue, zero-PII ActorRef, sanitasi James Wilson & catch kosong.** |
-| Phase 5A | Mesin OCR MRZ Paspor Nyata (Google ML Kit Text Recognition) | 6-8 h | ⬜ Belum | F-01, F-19 (eliminasi MobileScanner & bypass demo). |
+| **Phase 5A** | **Mesin OCR MRZ Paspor Nyata (Google ML Kit Text Recognition)** | **6-8 h** | **✅ Selesai** | **F-01, F-19, F-23 tuntas: kamera optik asli ML Kit, MrzExtractor, MrzFrameConsensus, eliminasi MobileScanner & bypass demo, input manual ICAO.** |
 | Phase 5B | Penerbitan BTID Otoritatif & Sanitasi Data Identitas | 4 h | ⬜ Belum | F-08, F-11, F-11b, F-13, F-13b (eliminasi BTID/DOB statis). |
 | Phase 6 | Parser Standar QRIS EMVCo TLV & Validasi CRC16-CCITT | 4-5 h | ⬜ Belum | F-14, F-14b (eliminasi string match coffee/tour). |
 | Phase 7 | Merchant Handshake Dua Arah Nyata (WebSocket/SSE + Push) | 7-9 h | ⬜ Belum | F-15, F-15b (eliminasi timer in-app simulation). |
@@ -33,7 +33,7 @@
 
 | ID | Judul Singkat Masalah & Lokasi | Severity | Phase | Status | PR / Commit | Bukti & Catatan Baseline | Tanggal |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **F-01** | `MobileScanner` (barcode) dipakai untuk MRZ; `google_mlkit` tidak pernah dipanggil | Kritis | 5A | ⬜ Belum | - | Terverifikasi di `mrz_scanner_screen.dart:295`. ML Kit tidak diimpor sama sekali di `lib/`. | 2026-11-17 |
+| **F-01** | `MobileScanner` (barcode) dipakai untuk MRZ; `google_mlkit` tidak pernah dipanggil | Kritis | 5A | ✅ Selesai | Branch `fix/real-behavior` | `MobileScanner` digantikan pipeline optik `camera` + `google_mlkit_text_recognition`, `MrzExtractor`, dan `MrzFrameConsensus`. | 2026-11-18 |
 | **F-02** | `.env` berisi `127.0.0.1` dikemas ke bundle asset APK rilis | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | `.env` dihapus dari assets & `.gitignore`, dependensi `flutter_dotenv` dibuang, migrasi ke `AppConfig`. | 2026-11-17 |
 | **F-03** | Fallback hash keccak256 palsu saat pembayaran Tourist Levy via wallet gagal | Kritis | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `payment_controller.dart`. Transaksi wajib on-chain dengan receipt status 1. | 2026-11-18 |
 | **F-03b** | Jalur Visa/Counter QR di `payment_controller.dart` juga memproduksi hash keccak256 palsu | Kritis | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `payment_controller.dart`. Metode non-wallet ditolak via ValidationFailure. | 2026-11-18 |
@@ -59,11 +59,11 @@
 | **F-16** | 43 test suite lulus hanya unit test + `MockClient` (ilusi coverage) | Tinggi | 10 | ⬜ Belum | - | Terverifikasi: 43 unit test lulus via MockClient tanpa pengujian RPC/server nyata. | 2026-11-17 |
 | **F-17** | Modul pembacaan chip NFC & Passive Authentication hanya simulasi timer | Sedang | 8 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:102,420`. | 2026-11-17 |
 | **F-18** | Liveness wajah dummy skor 98.7% tanpa label simulasi | Rendah | 9 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:790` (MATCH SCORE: 98.7%). | 2026-11-17 |
-| **F-19** | Tombol "Fast Demo Mode" di welcome screen & factory `demoJamesWilson()` di `lib/` | Kritis | 0/5A | ⬜ Belum | - | Terverifikasi di `welcome_screen.dart:225-248` & `mrz_parser.dart:58`. | 2026-11-17 |
+| **F-19** | Tombol "Fast Demo Mode" di welcome screen & factory `demoJamesWilson()` di `lib/` | Kritis | 0/5A | ✅ Selesai | Branch `fix/real-behavior` | Tombol Fast Demo Mode dan shortcut demo dihapus dari seluruh onboarding; factory dipindah ke `test/fixtures/`. | 2026-11-18 |
 | **F-20** | Alamat loopback `127.0.0.1` hardcoded langsung di kode Dart (bukan hanya .env) | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `blockchain_config.dart`, `graphql_provider.dart`, `payment_controller.dart`. Check 7 Reality Guard lolos hijau. | 2026-11-17 |
 | **F-21** | Blok `catch (_) {}` kosong total tanpa logging ditemukan di 14 titik | Tinggi | 2/3/4 | ✅ Selesai | Branch `fix/real-behavior` | Seluruh blok catch kosong di `lib/` telah disanitasi 100% (grep: 0 hit). Check Reality Guard hijau. | 2026-11-18 |
-| **F-22** | Android Manifest tidak mendeklarasikan izin `CAMERA` & `NFC` di manifest utama | Tinggi | 1/5A/8 | 🔄 Parsial (Manifest) | Branch `fix/real-behavior` | Izin `CAMERA` & `NFC` ditambahkan ke `AndroidManifest.xml` utama; security config cleartext debug ditambahkan. | 2026-11-17 |
-| **F-23** | Dependensi `camera` tidak terpasang di `pubspec.yaml` untuk frame OCR ML Kit | Kritis | 5A | ⬜ Belum | - | Terverifikasi di `pubspec.lock`: `camera: NOT INSTALLED`. | 2026-11-17 |
+| **F-22** | Android Manifest tidak mendeklarasikan izin `CAMERA` & `NFC` di manifest utama | Tinggi | 1/5A/8 | ✅ Selesai (Kamera) | Branch `fix/real-behavior` | Izin `CAMERA` telah aktif di manifest dan dikelola via runtime `permission_handler` di `mrz_scanner_screen.dart`. | 2026-11-18 |
+| **F-23** | Dependensi `camera` tidak terpasang di `pubspec.yaml` untuk frame OCR ML Kit | Kritis | 5A | ✅ Selesai | Branch `fix/real-behavior` | Terpasang `camera: ^0.12.2` & `permission_handler: ^13.0.2` di `pubspec.yaml`. | 2026-11-18 |
 | **F-24** | Tombol quick test di `send_scanner_screen.dart` memuat fixture JSON merchant statis | Sedang | 6 | ⬜ Belum | - | Terverifikasi di `send_scanner_screen.dart:143,186`. | 2026-11-17 |
 
 ---

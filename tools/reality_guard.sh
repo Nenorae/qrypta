@@ -92,6 +92,22 @@ else
   echo "✅ [PASS] Tidak ada hardcoded visaType di lib/"
 fi
 
+# 11. [F-01] MobileScanner tidak boleh digunakan di mrz_scanner_screen.dart (wajib Google ML Kit)
+if grep -rEn "MobileScanner" lib/src/features/authentication/presentation/screens/mrz_scanner_screen.dart 2>/dev/null; then
+  echo "❌ [FAIL] [F-01] MobileScanner masih digunakan di mrz_scanner_screen.dart (wajib ML Kit Text Recognition)"
+  FAILURES=$((FAILURES + 1))
+else
+  echo "✅ [PASS] [F-01] MobileScanner berhasil dieliminasi dari pemindai MRZ"
+fi
+
+# 12. [F-12/R3] Literal 'JAMES WILSON' (huruf besar) tidak boleh ada di lib/
+if grep -rEn "JAMES WILSON" lib/ 2>/dev/null; then
+  echo "❌ [FAIL] [F-12/R3] Literal 'JAMES WILSON' ditemukan di lib/"
+  FAILURES=$((FAILURES + 1))
+else
+  echo "✅ [PASS] Tidak ada literal 'JAMES WILSON' di lib/"
+fi
+
 echo "=================================================================="
 if [ $FAILURES -gt 0 ]; then
   echo "🚨 [REALITY GUARD MERAH] Ditemukan $FAILURES pelanggaran fatal integritas kode!"
