@@ -15,6 +15,8 @@ class BtidCredentialModel {
   final String? levyTxHash;
   final String walletAddress;
   final DateTime issuedAt;
+  final String? anchorTxHash;
+  final String immigrationSource;
 
   const BtidCredentialModel({
     required this.btidNumber,
@@ -31,6 +33,8 @@ class BtidCredentialModel {
     this.levyTxHash,
     required this.walletAddress,
     required this.issuedAt,
+    this.anchorTxHash,
+    this.immigrationSource = 'self_declared',
   });
 
   bool get isLevyPaid => levyStatus.toLowerCase() == 'paid';
@@ -40,7 +44,7 @@ class BtidCredentialModel {
       final expiryDate = DateTime.parse(stayExpiry);
       final difference = expiryDate.difference(DateTime.now()).inDays;
       return difference < 0 ? 0 : difference;
-    } catch (_) {
+    } on Object catch (_) {
       return 0;
     }
   }
@@ -60,6 +64,8 @@ class BtidCredentialModel {
     String? levyTxHash,
     String? walletAddress,
     DateTime? issuedAt,
+    String? anchorTxHash,
+    String? immigrationSource,
   }) {
     return BtidCredentialModel(
       btidNumber: btidNumber ?? this.btidNumber,
@@ -76,6 +82,8 @@ class BtidCredentialModel {
       levyTxHash: levyTxHash ?? this.levyTxHash,
       walletAddress: walletAddress ?? this.walletAddress,
       issuedAt: issuedAt ?? this.issuedAt,
+      anchorTxHash: anchorTxHash ?? this.anchorTxHash,
+      immigrationSource: immigrationSource ?? this.immigrationSource,
     );
   }
 
@@ -95,20 +103,47 @@ class BtidCredentialModel {
       'levyTxHash': levyTxHash,
       'walletAddress': walletAddress,
       'issuedAt': issuedAt.toIso8601String(),
+      'anchorTxHash': anchorTxHash,
+      'immigrationSource': immigrationSource,
     };
   }
 
   factory BtidCredentialModel.fromJson(Map<String, dynamic> json) {
+    final btid = json['btidNumber'] as String?;
+    if (btid == null || btid.trim().isEmpty) {
+      throw const FormatException('Missing required field: btidNumber');
+    }
+
+    final fullName = json['fullName'] as String?;
+    if (fullName == null || fullName.trim().isEmpty) {
+      throw const FormatException('Missing required field: fullName');
+    }
+
+    final dob = json['dob'] as String?;
+    if (dob == null || dob.trim().isEmpty) {
+      throw const FormatException('Missing required field: dob');
+    }
+
+    final docExpiry = json['docExpiry'] as String?;
+    if (docExpiry == null || docExpiry.trim().isEmpty) {
+      throw const FormatException('Missing required field: docExpiry');
+    }
+
+    final nationality = json['nationality'] as String?;
+    if (nationality == null || nationality.trim().isEmpty) {
+      throw const FormatException('Missing required field: nationality');
+    }
+
     return BtidCredentialModel(
-      btidNumber: json['btidNumber'] as String? ?? 'BTID-2026-4471-0938',
-      fullName: json['fullName'] as String? ?? 'Tourist',
-      nationality: json['nationality'] as String? ?? 'GBR',
-      passportMasked: json['passportMasked'] as String? ?? '••••••789',
-      dob: json['dob'] as String? ?? '1988-04-12',
-      docExpiry: json['docExpiry'] as String? ?? '2031-08-15',
-      visaType: json['visaType'] as String? ?? 'e-VOA B1',
-      arrivalDate: json['arrivalDate'] as String? ?? '2026-10-15',
-      stayExpiry: json['stayExpiry'] as String? ?? '2026-11-14',
+      btidNumber: btid,
+      fullName: fullName,
+      nationality: nationality,
+      passportMasked: json['passportMasked'] as String? ?? '••••••',
+      dob: dob,
+      docExpiry: docExpiry,
+      visaType: json['visaType'] as String? ?? 'Visit Visa',
+      arrivalDate: json['arrivalDate'] as String? ?? '',
+      stayExpiry: json['stayExpiry'] as String? ?? '',
       levyStatus: json['levyStatus'] as String? ?? 'unpaid',
       levyReceiptRef: json['levyReceiptRef'] as String?,
       levyTxHash: json['levyTxHash'] as String?,
@@ -116,25 +151,8 @@ class BtidCredentialModel {
       issuedAt: json['issuedAt'] != null
           ? DateTime.tryParse(json['issuedAt'] as String) ?? DateTime.now()
           : DateTime.now(),
-    );
-  }
-
-  /// Demo default credential matching the official Bali Tourist ID specification
-  factory BtidCredentialModel.defaultDemo({String walletAddress = '0x71C...B29'}) {
-    return BtidCredentialModel(
-      btidNumber: 'BTID-2026-4471-0938',
-      fullName: 'Tourist',
-      nationality: 'GBR',
-      passportMasked: '••••••789',
-      dob: '1988-04-12',
-      docExpiry: '2031-08-15',
-      visaType: 'e-VOA B1',
-      arrivalDate: '2026-10-15',
-      stayExpiry: '2026-11-14',
-      levyStatus: 'unpaid',
-      levyReceiptRef: null,
-      walletAddress: walletAddress,
-      issuedAt: DateTime.now(),
+      anchorTxHash: json['anchorTxHash'] as String?,
+      immigrationSource: json['immigrationSource'] as String? ?? 'self_declared',
     );
   }
 }

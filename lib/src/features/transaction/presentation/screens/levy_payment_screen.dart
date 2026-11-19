@@ -28,9 +28,9 @@ class _LevyPaymentScreenState extends ConsumerState<LevyPaymentScreen> {
     final tokensAsync = ref.watch(tokenNotifierProvider);
 
     final isPaid = btidCred?.isLevyPaid ?? false;
-    final fullName = (btidCred?.fullName.isNotEmpty == true) ? btidCred!.fullName : 'Tourist';
-    final passportMasked = btidCred?.passportMasked ?? '••••••789';
-    final btidNumber = btidCred?.btidNumber ?? 'BTID-2026-4471-0938';
+    final fullName = (btidCred?.fullName.isNotEmpty == true) ? btidCred!.fullName : 'Traveler';
+    final passportMasked = btidCred?.passportMasked ?? '-';
+    final btidNumber = (btidCred?.btidNumber.isNotEmpty == true) ? btidCred!.btidNumber : 'Belum terdaftar';
 
     // Ambil saldo IDRT dari provider tunggal
     final idrtBalanceFormatted = ref.watch(idrtBalanceFormattedProvider);

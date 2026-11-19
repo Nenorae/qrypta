@@ -86,7 +86,7 @@ class TabHome extends ConsumerWidget {
           const SizedBox(height: 16),
 
           // 7. Banner Status Tourist Levy
-          _buildLevyBanner(context, isPaid, btidCred),
+          _buildLevyBanner(context, ref, isPaid, btidCred),
           const SizedBox(height: 20),
 
           // 8. Grid Layanan Wisata Terpercaya (Trusted Services Grid)
@@ -373,8 +373,10 @@ class TabHome extends ConsumerWidget {
   }
 
   Widget _buildPermittedStayWidget(BuildContext context, dynamic btidCred) {
-    final daysLeft = btidCred?.daysRemaining ?? 28;
-    final visaType = btidCred?.visaType ?? 'e-VOA B1';
+    final daysLeft = btidCred?.daysRemaining ?? 0;
+    final visaType = (btidCred?.visaType != null && btidCred.visaType.isNotEmpty)
+        ? btidCred.visaType
+        : 'Tourist Visa';
 
     return InkWell(
       onTap: () => _showPermittedStayDetails(context, btidCred),
@@ -445,7 +447,7 @@ class TabHome extends ConsumerWidget {
     );
   }
 
-  Widget _buildLevyBanner(BuildContext context, bool isPaid, dynamic btidCred) {
+  Widget _buildLevyBanner(BuildContext context, WidgetRef ref, bool isPaid, dynamic btidCred) {
     if (isPaid) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -473,7 +475,7 @@ class TabHome extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      'Ref: ${btidCred?.levyReceiptRef ?? "LVY-448102"}',
+                      'Ref: ${btidCred?.levyReceiptRef ?? "-"}',
                       style: const TextStyle(
                         color: Color(0xFF94A3B8),
                         fontSize: 11,
@@ -853,9 +855,9 @@ class TabHome extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildModalRow('Visa Category', btidCred?.visaType ?? 'e-VOA B1 (Tourism)'),
-                _buildModalRow('Arrival Date', btidCred?.arrivalDate ?? '2026-10-15'),
-                _buildModalRow('Permit Expiry', btidCred?.stayExpiry ?? '2026-11-14'),
+                _buildModalRow('Visa Category', (btidCred?.visaType != null && btidCred.visaType.isNotEmpty) ? btidCred.visaType : 'Tourist Visa'),
+                _buildModalRow('Arrival Date', btidCred?.arrivalDate ?? '-'),
+                _buildModalRow('Permit Expiry', btidCred?.stayExpiry ?? '-'),
                 _buildModalRow('Immigration Anchor', 'Kantor Imigrasi Kelas I Khusus TPI Ngurah Rai'),
                 _buildModalRow('Extension Status', 'Eligible for 1x 30-day extension via official portal'),
                 const SizedBox(height: 16),

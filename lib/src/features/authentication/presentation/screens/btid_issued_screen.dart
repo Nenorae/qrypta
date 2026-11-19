@@ -3,9 +3,9 @@
 import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
 import 'package:qrypta/src/core/data/models/btid_credential_model.dart';
+import 'package:qrypta/src/core/error/app_failure.dart';
 import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
 import 'package:qrypta/src/core/utils/mrz_parser.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/auth_providers.dart';
@@ -56,45 +56,24 @@ class _BtidIssuedScreenState extends ConsumerState<BtidIssuedScreen> {
       await savePrivateKeyUseCase(privateKey);
       await savePinUseCase('123456'); // Default initial PIN for fast onboarding
 
-      developer.log('Step 2: Constructing BTID Credential...', name: 'BtidIssuedScreen');
-      final now = DateTime.now();
-      final arrivalDateStr = DateFormat('yyyy-MM-dd').format(now);
-      final stayExpiryStr = DateFormat('yyyy-MM-dd').format(now.add(const Duration(days: 30)));
-
-      // 3. Construct official BtidCredentialModel
-      final credential = BtidCredentialModel(
-        btidNumber: 'BTID-2026-4471-0938',
-        fullName: widget.mrzResult.fullName,
-        nationality: widget.mrzResult.nationality,
-        passportMasked: widget.mrzResult.passportMasked,
-        dob: widget.mrzResult.birthDate != null
-            ? DateFormat('yyyy-MM-dd').format(widget.mrzResult.birthDate!)
-            : '1988-04-12',
-        docExpiry: widget.mrzResult.expiryDate != null
-            ? DateFormat('yyyy-MM-dd').format(widget.mrzResult.expiryDate!)
-            : '2031-08-15',
-        visaType: 'e-VOA B1',
-        arrivalDate: arrivalDateStr,
-        stayExpiry: stayExpiryStr,
-        levyStatus: 'unpaid',
+      developer.log('Step 2: Issuing official BTID Credential from server...', name: 'BtidIssuedScreen');
+      // 3. Issue authoritative BTID Credential from server (Phase 5B.1 / F-11 / F-08)
+      final btidIssuanceService = ref.read(btidIssuanceServiceProvider);
+      final credential = await btidIssuanceService.issueCredential(
+        mrzResult: widget.mrzResult,
         walletAddress: address,
-        issuedAt: now,
       );
 
-      // 4. Save credential locally
+      // 4. Save credential locally only after authoritative confirmation
       await ref.read(btidCredentialProvider.notifier).saveCredential(credential);
 
-      // 5. Submit issuance audit record to ezsign-core / Besu
-      try {
-        final verificationService = ref.read(blockchainServiceProvider).verification;
-        await verificationService.recordCredentialIssuedAudit(
-          btid: credential.btidNumber,
-          fullName: credential.fullName,
-          walletAddress: address,
-        );
-      } catch (e) {
-        developer.log('Audit record dispatched with local fallback: $e', name: 'BtidIssuedScreen');
-      }
+      // 5. Submit issuance audit record to ezsign-core / Besu (handled with outbox in Phase 4)
+      final verificationService = ref.read(blockchainServiceProvider).verification;
+      await verificationService.recordCredentialIssuedAudit(
+        btid: credential.btidNumber,
+        fullName: credential.fullName,
+        walletAddress: address,
+      );
 
       // 6. Invalidate authStateProvider so lock wrapper recognizes the wallet
       ref.invalidate(authStateProvider);
@@ -105,11 +84,12 @@ class _BtidIssuedScreenState extends ConsumerState<BtidIssuedScreen> {
           _isIssuing = false;
         });
       }
-    } catch (e) {
-      developer.log('Error during auto-issuance: $e', name: 'BtidIssuedScreen', error: e);
+    } on Object catch (e) {
+      developer.log('Error during BTID auto-issuance: $e', name: 'BtidIssuedScreen', error: e);
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString();
+          _errorMessage = e is AppFailure ? e.message : e.toString();
+          _issuedCredential = null;
           _isIssuing = false;
         });
       }
@@ -207,7 +187,10 @@ class _BtidIssuedScreenState extends ConsumerState<BtidIssuedScreen> {
   }
 
   Widget _buildIssuedSuccess() {
-    final credential = _issuedCredential ?? BtidCredentialModel.defaultDemo();
+    final credential = _issuedCredential;
+    if (credential == null) {
+      return _buildErrorView();
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),

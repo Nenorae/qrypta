@@ -96,7 +96,7 @@ const Map<String, AttributeDefinition> policyAttributes = {
   'visa_type': AttributeDefinition(
     key: 'visa_type',
     label: 'Visa Class',
-    description: 'Official immigration visa type (e.g. e-VOA B1)',
+    description: 'Official immigration visa type (e.g. Visit Visa)',
     defaultReason: 'Validates traveler visa category',
   ),
   'stay_valid': AttributeDefinition(

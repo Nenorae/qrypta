@@ -17,7 +17,7 @@
 | **Phase 3** | **Transaksi Finansial Nyata (Tourist Levy ERC-20 & QRIS IDRT)** | **5-6 h** | **✅ Selesai** | **F-03, F-03b, F-04, F-09, F-09b, F-10, F-10b tuntas: eliminasi fallback hash, single-source idrtBalanceProvider.** |
 | **Phase 4** | **Consent, Revocation & Financial Audit Nyata** | **5 h** | **✅ Selesai** | **F-05, F-06, F-07, F-12, F-12b, F-21 tuntas: outbox offline queue, zero-PII ActorRef, sanitasi James Wilson & catch kosong.** |
 | **Phase 5A** | **Mesin OCR MRZ Paspor Nyata (Google ML Kit Text Recognition)** | **6-8 h** | **✅ Selesai** | **F-01, F-19, F-23 tuntas: kamera optik asli ML Kit, MrzExtractor, MrzFrameConsensus, eliminasi MobileScanner & bypass demo, input manual ICAO.** |
-| Phase 5B | Penerbitan BTID Otoritatif & Sanitasi Data Identitas | 4 h | ⬜ Belum | F-08, F-11, F-11b, F-13, F-13b (eliminasi BTID/DOB statis). |
+| **Phase 5B** | **Penerbitan BTID Otoritatif & Sanitasi Data Identitas** | **4 h** | **✅ Selesai** | **F-08, F-11, F-11b, F-13, F-13b tuntas: penerbitan server otoritatif, eliminasi BTID & DOB statis, Zero-PII passportHash HMAC-SHA256, HolderProfile.** |
 | Phase 6 | Parser Standar QRIS EMVCo TLV & Validasi CRC16-CCITT | 4-5 h | ⬜ Belum | F-14, F-14b (eliminasi string match coffee/tour). |
 | Phase 7 | Merchant Handshake Dua Arah Nyata (WebSocket/SSE + Push) | 7-9 h | ⬜ Belum | F-15, F-15b (eliminasi timer in-app simulation). |
 | Phase 8 | Pembacaan Chip e-Passport NFC & Passive Authentication (PA) | 10-15 h | ⬜ Belum | F-17 (bergantung keputusan D-1). |
@@ -41,17 +41,17 @@
 | **F-05** | Consent submit ditelan `catch`, otomatis disimpan status "Approved" lokal | Tinggi | 4 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `verification_transaction_service.dart`. Approval wajib ack 2xx Fastify, error dilempar sebagai AppFailure. | 2026-11-18 |
 | **F-06** | Revocation akses ditelan `catch`, otomatis disimpan status "Revoked" lokal | Tinggi | 4 | ✅ Selesai | Branch `fix/real-behavior` | Pencabutan dialihkan ke Outbox saat offline dengan status pending_sync dan peringatan merchant access jelas. | 2026-11-18 |
 | **F-07** | Audit finansial levy & QRIS ditelan `catch` hanya dengan `developer.log` | Tinggi | 4 | ✅ Selesai | Branch `fix/real-behavior` | Audit levy & QRIS dialihkan ke Outbox saat offline dengan status pending_sync (R7). | 2026-11-18 |
-| **F-08** | Audit penerbitan BTID ditelan `catch`, kartu tetap terbit dengan hash keccak palsu | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `verification_transaction_service.dart:382,410`. | 2026-11-17 |
+| **F-08** | Audit penerbitan BTID ditelan `catch`, kartu tetap terbit dengan hash keccak palsu | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | Eliminasi silent catch lokal di `btid_issued_screen.dart`. Kartu BTID hanya tampil setelah penerbitan otoritatif server berhasil. | 2026-11-19 |
 | **F-09** | Saldo default `Rp 2.480.000` di `levy_payment_screen.dart` | Tinggi | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi, bermigrasi ke single-source idrtBalanceFormattedProvider. | 2026-11-18 |
 | **F-09b** | Saldo default `Rp 2.480.000` di `tab_home.dart` dan `qris_payment_screen.dart` | Tinggi | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari seluruh file, nol hit grep di seluruh repo. | 2026-11-18 |
 | **F-10** | Hash statis kuitansi `0x7b2f8a1e...` di `levy_payment_screen.dart` | Sedang | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi, digantikan hash on-chain riil dari state BtidCredentialModel/LevyReceiptData. | 2026-11-18 |
 | **F-10b** | Hash statis kuitansi `0x7b2f8a1e...` di `tab_home.dart` dan `tab_profile.dart` | Sedang | 3 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari dashboard dan profil, nol hit grep di seluruh repo. | 2026-11-18 |
-| **F-11** | Nomor BTID statis `BTID-2026-4471-0938` di `btid_issued_screen.dart` | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `btid_issued_screen.dart:66`. | 2026-11-17 |
-| **F-11b** | Nomor BTID statis tersebar di 8 file tambahan (model deserializer, controller, screens) | Tinggi | 5B | ⬜ Belum | - | Terverifikasi 14 hit di 10 file (termasuk `btid_credential_model.dart:98,119`). | 2026-11-17 |
+| **F-11** | Nomor BTID statis `BTID-2026-4471-0938` di `btid_issued_screen.dart` | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `btid_issued_screen.dart`, nomor BTID resmi diterbitkan oleh backend ezsign-core. | 2026-11-19 |
+| **F-11b** | Nomor BTID statis tersebar di 8 file tambahan (model deserializer, controller, screens) | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari seluruh basis kode `lib/` (0 hit grep). Default demo constructor dihapus. | 2026-11-19 |
 | **F-12** | Actor `James Wilson` di 5 lokasi service audit | Tinggi | 4/5B | ✅ Selesai | Branch `fix/real-behavior` | ActorRef salted hash (zero-PII D-8) menggantikan literal James Wilson di seluruh service audit. | 2026-11-18 |
 | **F-12b** | `James Wilson` tertanam di DTO model, factory MRZ parser, dan UI screens | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | James Wilson dieliminasi 100% dari seluruh `lib/` (grep: 0 hit). demoJamesWilson dipindah ke test/fixtures/. | 2026-11-18 |
-| **F-13** | Default imigrasi (DOB, expiry, visaType) di `btid_issued_screen.dart` | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `btid_issued_screen.dart:72-76`. | 2026-11-17 |
-| **F-13b** | Default imigrasi (`1988-04-12`, `2031-08-15`, `e-VOA B1`) tertanam di DTO model | Tinggi | 5B | ⬜ Belum | - | Terverifikasi di `btid_credential_model.dart:102-104,123-125`. | 2026-11-17 |
+| **F-13** | Default imigrasi (DOB, expiry, visaType) di `btid_issued_screen.dart` | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi. DOB dan docExpiry diambil strictly dari MRZ dan dicek kedaluwarsa; visaType dari backend imigrasi. | 2026-11-19 |
+| **F-13b** | Default imigrasi (`1988-04-12`, `2031-08-15`, `e-VOA B1`) tertanam di DTO model | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `btid_credential_model.dart` (wajib di fromJson, throw FormatException) & policy_matrix (0 hit grep di lib/). | 2026-11-19 |
 | **F-14** | Parser QRIS EMVCo TLV tidak ada; string match 'coffee'/'tour'/MCH di `tab_pay.dart` | Tinggi | 6 | ⬜ Belum | - | Terverifikasi di `tab_pay.dart:25,53,69`. | 2026-11-17 |
 | **F-14b** | Duplikasi logika string match di `qr_scanner_screen.dart` & `policy_matrix_constants` | Tinggi | 6 | ⬜ Belum | - | Terverifikasi di `qr_scanner_screen.dart:51,79,95`. | 2026-11-17 |
 | **F-15** | Handshake merchant hanya simulasi in-app berbasis delay timer | Tinggi | 7 | ⬜ Belum | - | Terverifikasi di `verification_controller.dart:148`. Tidak ada koneksi transport. | 2026-11-17 |
@@ -117,3 +117,22 @@
 - **UI Status Sinkronisasi & Sync Center (Phase 4.5):** Menambahkan chip visual status sinkronisasi (`Synced`, `Menunggu Sinkron`, `Ditolak Server`, `Tidak Terverifikasi`), kotak detail error/peringatan, dan antarmuka `Sync Center` interaktif dengan tombol "Kirim Ulang Sekarang" di `privacy_audit_screen.dart`.
 - **Pengujian Unit L1:** Dibuat 12 pengujian unit baru di `test/phase4_consent_audit_test.dart`. Total pengujian aktif seluruh proyek kini **96/96 lulus 100% (0 failed)**.
 - **Status Akhir Phase 4:** Selesai 100%. Siap melangkah ke Phase 5A (Mesin OCR MRZ Paspor Asli).
+
+### 18 November 2026 - Phase 5A Execution
+- **Eliminasi MobileScanner & Integrasi ML Kit Asli (F-01, F-23):** Melepas `MobileScanner` dari pemindai MRZ paspor. Mengintegrasikan kamera native (`camera: ^0.12.2`) dan Google ML Kit Text Recognition (`google_mlkit_text_recognition: ^1.0.2`) dengan kompensasi sensor rotasi dan throttle frame 250ms.
+- **Ekstraksi & Koreksi Optik Berbasis Field (MrzExtractor):** Mengembangkan mesin ekstraksi pasangan baris TD3 dengan koreksi karakter optik berbasis tipe field ICAO Doc 9303 modulo 10 (angka vs huruf vs filler `<`).
+- **Konsensus Multi-Frame (MrzFrameConsensus):** Mensyaratkan minimal 2 frame berturut-turut menghasilkan MRZ identik dalam jendela 2 detik untuk menjamin 0 false acceptances.
+- **Eliminasi Fast Demo Bypass & James Wilson (F-19):** Menghapus tombol demo dari `mrz_scanner_screen.dart` dan memindahkan factory demo ke `test/fixtures/`. Menyediakan form Input Paspor Manual tervalidasi ICAO sebagai alternatif nyata.
+- **Pengujian Unit L1:** Dibuat 18 pengujian unit baru di `test/phase5a_mrz_ocr_test.dart`. Total pengujian aktif seluruh proyek menjadi **114/114 lulus 100%**.
+- **Status Akhir Phase 5A:** Selesai 100%. Siap melangkah ke Phase 5B (Penerbitan BTID Otoritatif).
+
+### 19 November 2026 - Phase 5B Execution
+- **Penerbitan BTID Otoritatif dari Server (Phase 5B.1 / F-11 & F-08):** Membangun `BtidIssuanceService` yang mengeksekusi `POST /credentials/btid` ke backend middleware `ezsign-core` dengan header `Idempotency-Key` (SHA-256) untuk mencegah penerbitan ganda. Kartu BTID hanya dirender setelah server merespons HTTP 200/201 dengan `btidNumber` resmi.
+- **Eliminasi Silent Catch Fallback Lokal (F-08):** Menghapus penelanan error catch di `btid_issued_screen.dart:96`. Jika backend offline atau gagal, aplikasi menampilkan layar error "Penerbitan Belum Dapat Diselesaikan" dengan tombol "Coba Lagi" tanpa menampilkan kartu palsu.
+- **Eliminasi Total BTID Statis (F-11 & F-11b):** Menghapus literal `BTID-2026-4471-0938` dari seluruh basis kode `lib/` (0 hit grep). Menghapus `BtidCredentialModel.defaultDemo()`, membersihkan fallback di `dynamic_qr_screen.dart`, `tab_profile.dart`, dan `levy_payment_screen.dart`.
+- **Eliminasi Default Imigrasi & Sanitasi Model (F-13 & F-13b):** Menghapus `'1988-04-12'`, `'2031-08-15'`, dan `'e-VOA B1'` dari `lib/` (0 hit grep). Memperketat deserialisasi `BtidCredentialModel.fromJson` agar melempar `FormatException` jika field wajib (`btidNumber`, `fullName`, `nationality`, `dob`, `docExpiry`) tidak tersedia.
+- **Validasi Paspor Pre-Flight & Proteksi Kedaluwarsa (Phase 5B.2):** Validasi ketat paspor sebelum panggilan jaringan: tanggal lahir dan kedaluwarsa wajib valid, dan paspor yang telah kedaluwarsa seketika ditolak dengan `ValidationFailure`.
+- **Resolusi Data Imigrasi Otoritatif vs Deklarasi Mandiri (Phase 5B.3 / D-2):** Mengintegrasikan `fetchImmigrationData` via `GET /immigration/evoa?passportHash=...`. Jika backend imigrasi tidak tersedia, sistem mencatat status `source: "self_declared"` secara transparan tanpa status verified palsu.
+- **Holder Profile & Identitas Aktor Real (Phase 5B.4 / F-12 UI):** Mengimplementasikan model `HolderProfile` dan provider `holderProfileProvider` yang mengikat identitas aktif ke `ActorRef` zero-PII (salted HMAC-SHA256).
+- **Pengujian Unit L1:** Dibuat 17 pengujian unit baru di `test/phase5b_btid_issuance_test.dart`. Total pengujian aktif seluruh proyek kini **131/131 lulus 100% (0 failed)**.
+- **Status Akhir Phase 5B:** Selesai 100%. Siap melangkah ke Phase 6 (Parser QRIS EMVCo TLV & CRC16).

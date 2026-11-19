@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:qrypta/src/core/data/models/actor_ref.dart';
 import 'package:qrypta/src/core/data/models/btid_credential_model.dart';
+import 'package:qrypta/src/core/data/models/holder_profile.dart';
+import 'package:qrypta/src/core/services/identity/btid_issuance_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String _btidBoxName = 'btid_credential_box';
@@ -16,10 +18,14 @@ final btidCredentialProvider =
   return BtidCredentialNotifier();
 });
 
+final btidIssuanceServiceProvider = Provider<BtidIssuanceService>((ref) {
+  return BtidIssuanceService();
+});
+
 /// Provider referensi aktor zero-PII untuk audit (Phase 4.4).
 final actorRefProvider = Provider<ActorRef?>((ref) {
   final cred = ref.watch(btidCredentialProvider);
-  if (cred == null || cred.walletAddress.isEmpty) return null;
+  if (cred == null || cred.walletAddress.isEmpty || cred.btidNumber.isEmpty) return null;
   return ActorRef.fromCredential(
     walletAddress: cred.walletAddress,
     btidNumber: cred.btidNumber,
@@ -27,7 +33,16 @@ final actorRefProvider = Provider<ActorRef?>((ref) {
   );
 });
 
-final holderProfileProvider = actorRefProvider;
+/// Provider profil pemegang identitas resmi (Phase 5B.4).
+final holderProfileProvider = Provider<HolderProfile?>((ref) {
+  final cred = ref.watch(btidCredentialProvider);
+  if (cred == null || cred.walletAddress.isEmpty || cred.btidNumber.isEmpty) return null;
+  return HolderProfile.fromCredential(
+    fullName: cred.fullName,
+    walletAddress: cred.walletAddress,
+    btidNumber: cred.btidNumber,
+  );
+});
 
 class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
   BtidCredentialNotifier() : super(null) {

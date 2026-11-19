@@ -42,7 +42,9 @@ class _DynamicQrScreenState extends ConsumerState<DynamicQrScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(verificationControllerProvider);
     final credential = ref.watch(btidCredentialProvider);
-    final btidNumber = credential?.btidNumber ?? 'BTID-2026-4471-0938';
+    final btidNumber = (credential?.btidNumber.isNotEmpty == true)
+        ? credential!.btidNumber
+        : 'Belum Terdaftar';
     final progress = state.remainingSeconds / 45.0;
 
     return Scaffold(
@@ -173,9 +175,26 @@ class _DynamicQrScreenState extends ConsumerState<DynamicQrScreen> {
                                   color: Color(0xFF0A0F1D),
                                 ),
                               )
-                            : const SizedBox(
+                            : SizedBox(
                                 height: 230,
-                                child: Center(child: CircularProgressIndicator()),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(Icons.lock_outline_rounded, size: 40, color: Colors.grey),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Belum Terdaftar',
+                                        style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Selesaikan onboarding paspor',
+                                        style: TextStyle(color: Colors.black54, fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                       ),
 
