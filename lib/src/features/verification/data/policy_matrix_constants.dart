@@ -374,51 +374,60 @@ class DemoMerchantInfo {
   });
 }
 
-const Map<String, DemoMerchantInfo> demoMerchants = {
-  'hotel': DemoMerchantInfo(
+/// Kategori merchant terakreditasi untuk ekosistem Bali.
+const String categoryHotel = 'hotel';
+const String categoryCar = 'car';
+const String categoryCafe = 'cafe';
+const String categoryEsim = 'esim';
+const String categoryTour = 'tour';
+
+/// Mitra merchant resmi terakreditasi untuk tampilan ekosistem produksi.
+/// Data fixture uji staging telah dipindahkan ke `test/fixtures/demo_merchants_fixture.dart` (Phase 6.4 / F-14b).
+const Map<String, DemoMerchantInfo> accreditedMerchants = {
+  categoryHotel: DemoMerchantInfo(
     id: 'MCH-1042',
     name: 'Bali Ocean Resort',
-    category: 'hotel',
+    category: categoryHotel,
     location: 'Seminyak, Bali',
     staffName: 'Kadek Sari',
     staffRole: 'Front Desk Agent',
     defaultTemplate: 'hotel_checkin',
     walletAddress: '0x10427b328d54236354050b188c03508f7b7643e2',
   ),
-  'car': DemoMerchantInfo(
+  categoryCar: DemoMerchantInfo(
     id: 'MCH-2087',
     name: 'Island Drive Car Rental',
-    category: 'car',
+    category: categoryCar,
     location: 'Kuta, Bali',
     staffName: 'Gede Mahendra',
     staffRole: 'Rental Agent',
     defaultTemplate: 'vehicle_rental',
     walletAddress: '0x2089c97fe5b2f2757f58a8a9a2a92c42289c0911',
   ),
-  'cafe': DemoMerchantInfo(
-    id: 'MCH-3311',
-    name: 'Bali Coffee House',
-    category: 'cafe',
+  categoryCafe: DemoMerchantInfo(
+    id: 'MCH-1043',
+    name: 'Bali Heritage Cafe',
+    category: categoryCafe,
     location: 'Canggu, Bali',
     staffName: 'Wayan Putra',
     staffRole: 'Barista & Cashier',
     defaultTemplate: 'age_check',
-    walletAddress: '0x3311A9908F8718E237aDE73708aB59f212284bE0',
+    walletAddress: '0x3311a9908f8718e237ade73708ab59f212284be0',
   ),
-  'esim': DemoMerchantInfo(
+  categoryEsim: DemoMerchantInfo(
     id: 'MCH-4190',
     name: 'Bali Connect eSIM',
-    category: 'esim',
+    category: categoryEsim,
     location: 'Denpasar, Bali',
     staffName: 'Ketut Suastika',
     staffRole: 'Support Specialist',
     defaultTemplate: 'esim_activation',
     walletAddress: '0x4190825f385c7d2350a58adfc0f7193d256db01b',
   ),
-  'tour': DemoMerchantInfo(
-    id: 'MCH-5520',
-    name: 'Bali Adventure Tours',
-    category: 'tour',
+  categoryTour: DemoMerchantInfo(
+    id: 'MCH-1045',
+    name: 'Bali Eco Expeditions',
+    category: categoryTour,
     location: 'Ubud, Bali',
     staffName: 'Made Artha',
     staffRole: 'Head Guide',
@@ -427,5 +436,6 @@ const Map<String, DemoMerchantInfo> demoMerchants = {
   ),
 };
 
-/// Alias DEMO_MERCHANTS untuk kompatibilitas spesifikasi dokumen
-const Map<String, DemoMerchantInfo> DEMO_MERCHANTS = demoMerchants;
+/// Alias kompatibilitas aplikasi untuk mitra ekosistem terakreditasi
+const Map<String, DemoMerchantInfo> demoMerchants = accreditedMerchants;
+const Map<String, DemoMerchantInfo> DEMO_MERCHANTS = accreditedMerchants;

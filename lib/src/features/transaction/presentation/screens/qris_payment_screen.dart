@@ -15,14 +15,16 @@ class QrisPaymentScreen extends ConsumerStatefulWidget {
   final String merchantAddress;
   final int initialAmount;
   final String itemDescription;
+  final bool isAmountLocked;
 
   const QrisPaymentScreen({
     super.key,
-    this.merchantName = 'Bali Coffee House - Canggu',
-    this.merchantId = 'MCH-3311',
-    this.merchantAddress = '0x3311A9908F8718E237aDE73708aB59f212284bE0',
-    this.initialAmount = 85000,
-    this.itemDescription = 'Specialty Coffee & Pastry',
+    required this.merchantName,
+    required this.merchantId,
+    required this.merchantAddress,
+    this.initialAmount = 0,
+    this.itemDescription = 'Merchant Settlement',
+    this.isAmountLocked = false,
   });
 
   @override
@@ -31,13 +33,15 @@ class QrisPaymentScreen extends ConsumerStatefulWidget {
 
 class _QrisPaymentScreenState extends ConsumerState<QrisPaymentScreen> {
   late final TextEditingController _amountController;
-  int _currentAmount = 85000;
+  late int _currentAmount;
 
   @override
   void initState() {
     super.initState();
     _currentAmount = widget.initialAmount;
-    _amountController = TextEditingController(text: _currentAmount.toString());
+    _amountController = TextEditingController(
+      text: _currentAmount > 0 ? _currentAmount.toString() : '',
+    );
   }
 
   @override
@@ -221,6 +225,9 @@ class _QrisPaymentScreenState extends ConsumerState<QrisPaymentScreen> {
   }
 
   Widget _buildPresetChips() {
+    if (widget.isAmountLocked) {
+      return const SizedBox.shrink();
+    }
     final presets = [50000, 85000, 150000, 250000];
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -338,20 +345,45 @@ class _QrisPaymentScreenState extends ConsumerState<QrisPaymentScreen> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.2)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Icon(Icons.lock_person_rounded, color: Color(0xFF2DD4BF), size: 18),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Merchant only receives Payment Confirmed — Zero passport, identity, or personal data shared.',
-              style: TextStyle(
-                color: Color(0xFF94A3B8),
-                fontSize: 12,
-                height: 1.4,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Icon(Icons.lock_person_rounded, color: Color(0xFF2DD4BF), size: 18),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Merchant only receives Payment Confirmed — Zero passport, identity, or personal data shared.',
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
               ),
-            ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Divider(color: Color(0xFF1E293B), height: 1),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Icon(Icons.info_outline_rounded, color: Color(0xFF38BDF8), size: 16),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Stiker QRIS fisik terhubung ke rail Rupiah PJP/Bank. Pembayaran on-chain IDRT diproses eksklusif ke merchant konsorsium terdaftar.',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

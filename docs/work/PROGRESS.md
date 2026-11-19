@@ -136,3 +136,22 @@
 - **Holder Profile & Identitas Aktor Real (Phase 5B.4 / F-12 UI):** Mengimplementasikan model `HolderProfile` dan provider `holderProfileProvider` yang mengikat identitas aktif ke `ActorRef` zero-PII (salted HMAC-SHA256).
 - **Pengujian Unit L1:** Dibuat 17 pengujian unit baru di `test/phase5b_btid_issuance_test.dart`. Total pengujian aktif seluruh proyek kini **131/131 lulus 100% (0 failed)**.
 - **Status Akhir Phase 5B:** Selesai 100%. Siap melangkah ke Phase 6 (Parser QRIS EMVCo TLV & CRC16).
+
+### 19 November 2026 - Phase 6 Execution
+- **Implementasi Mesin Parser QRIS EMVCo TLV & CRC16 Asli (Phase 6.2 / F-14):** Membangun `QrisParser` murni yang mengekstraksi seluruh tag EMVCo MPM dan Standar Nasional QRIS (PADG BI No. 21/18/PADG/2019) secara rekursif (tags 26–51, 62). Mengimplementasikan validasi kriptografis CRC16/CCITT-FALSE (poly `0x1021`, init `0xFFFF`) atas seluruh string payload hingga tag `6304`. Menolak seketika payload dengan CRC korup, mata uang non-IDR (bukan 360), nominal tidak valid, atau tag wajib hilang.
+- **Eksekusi Parsing pada Background Isolate (Phase 6.2 #5):** Mengimplementasikan `QrisParser.parseInIsolate` via `Isolate.run`, menjamin rendering kamera scanner pada UI thread tetap responsif (60 FPS) tanpa freeze saat memproses string QR kompleks.
+- **Router Payload Deterministik (`QrPayloadRouter` - Phase 6.1):** Menghilangkan seluruh tebakan kata kunci dan pencocokan string bebas. Urutan routing ketat:
+  1. Diawali `000201` -> kandidat EMVCo QRIS -> `QrisParser`.
+  2. Regex `^0x[0-9a-fA-F]{40}$` -> alamat dompet EVM langsung, dengan penegakan validasi checksum EIP-55 bila huruf campuran (mixed-case).
+  3. JSON berskema versi (`{"v":1,"type":...,"sig":...}`) -> protokol native Qrypta dengan verifikasi tanda tangan secp256k1 (130 hex + 0x prefix).
+  4. Selain itu -> seketika melempar `ValidationFailure("QR tidak dikenali.")` tanpa tebakan atau fallback default.
+- **Layanan Resolusi Merchant Otoritatif (`MerchantResolverService` - Phase 6.3 / D-4):** Mengintegrasikan lookup identitas merchant ke endpoint backend `GET /merchants/resolve?nmid=...`. Memvalidasi bahwa stiker QRIS fisik terhubung ke rail Rupiah perbankan (PJP), dan pembayaran on-chain IDRT hanya dieksekusi apabila merchant terdaftar dan berstatus `verified: true` di konsorsium. Apabila NMID tidak terdaftar atau HTTP 404, sistem melempar `MerchantNotRegistered` tanpa transaksi dan tanpa memalsukan status sukses.
+- **Pembersihan String-Match Primitif & Duplikasi Scanner (Phase 6.4 / F-14 & F-14b):**
+  - Menghapus 100% percabangan `coffee`, `tour`, `MCH-3311`, dan `MCH-5520` dari `tab_pay.dart` dan `qr_scanner_screen.dart`.
+  - Menghapus tombol shortcut simulasi injeksi payload demo dari `send_scanner_screen.dart`.
+  - Menghapus fallback default nilai parameter konstruktor di `qris_payment_screen.dart` (mewajibkan `merchantName`, `merchantId`, `merchantAddress`).
+  - Memindahkan fixture data uji staging `MCH-3311` dan `MCH-5520` ke `test/fixtures/demo_merchants_fixture.dart`. Kode produksi `lib/` kini 100% bebas dari literal merchant uji.
+  - Check Reality Guard CI `F-14b` dan Check 1 kini berstatus **HIJAU** (`✅ [PASS] Tidak ada string-match merchant primitif di features/` & `✅ [PASS] Tidak ada literal palsu dasar di lib/`).
+- **Koleksi Fixture Representatif 32 QRIS Riil:** Membuat `test/fixtures/qris_fixtures.dart` yang memuat 32 payload QRIS riil terverifikasi CRC16 bit-level (statis, dinamis, berbagai acquirer perbankan nasional & dompet digital: BCA, Mandiri, BRI, BNI, BPD Bali, GoPay, OVO, DANA, ShopeePay, LinkAja, Nobu, CIMB, Permata, Danamon, BSI, Netzme, Xendit, DOKU, OttoPay, KasPro).
+- **Pengujian Unit & Integrasi L1 & L2 (Phase 6.5):** Dibuat 26 pengujian komprehensif di `test/phase6_qris_parser_test.dart` (32 fixture parsing, ekstraksi statis/dinamis/tip/fee, pengujian isolate, 10 uji negatif CRC/panjang/mata uang/negara, 300 iterasi fuzzing mutasi bit-flip acak, routing deterministik, dan resolusi merchant L2). Total pengujian aktif seluruh proyek kini **157/157 lulus 100% (0 failed)**.
+- **Status Akhir Phase 6:** Selesai 100%. Siap melangkah ke Phase 7 (Handshake Merchant Dua Arah & WebSocket/FCM).

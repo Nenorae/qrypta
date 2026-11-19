@@ -203,8 +203,8 @@ Tabel `PROGRESS.md` harus mencakup semua temuan baru hasil verifikasi di Phase 0
 | F-12b | James Wilson di model data, MRZ parser, UI screens          | Tinggi   | 5B    | ⬜ Belum      |           |                           |         |
 | F-13  | Default DOB/docExpiry/visaType di btid_issued_screen        | Tinggi   | 5B    | ⬜ Belum      |           |                           |         |
 | F-13b | Default yang sama di btid_credential_model & consent_screen | Tinggi   | 5B    | ⬜ Belum      |           |                           |         |
-| F-14  | QRIS string-match coffee/tour/MCH di tab_pay                | Tinggi   | 6     | ⬜ Belum      |           |                           |         |
-| F-14b | Duplikasi string-match di qr_scanner_screen & policy_matrix | Tinggi   | 6     | ⬜ Belum      |           |                           |         |
+| F-14  | QRIS string-match coffee/tour/MCH di tab_pay                | Tinggi   | 6     | ✅ Selesai    | 19 Nov    | Nenorae                   | PR #6   |
+| F-14b | Duplikasi string-match di qr_scanner_screen & policy_matrix | Tinggi   | 6     | ✅ Selesai    | 19 Nov    | Nenorae                   | PR #6   |
 | F-15  | Handshake merchant hanya simulasi in-app                    | Tinggi   | 7     | ⬜ Belum      |           |                           |         |
 | F-15b | triggerMerchantSimulation di 3 titik panggilan              | Tinggi   | 7     | ⬜ Belum      |           |                           |         |
 | F-16  | 43 test hanya unit + MockClient                             | Tinggi   | 10    | ⬜ Belum      |           |                           |         |
@@ -899,7 +899,7 @@ Rilis diizinkan hanya jika **semua** terpenuhi:
 - [ ] **[BARU — F-03b]** Tidak ada jalur pembayaran Visa/Counter QR yang menghasilkan status "Paid" tanpa transaksi nyata; opsi ini dinonaktifkan atau dihapus dari UI.
 - [ ] **[BARU — F-09b/F-10b]** Grep untuk `Rp 2.480.000` dan `0x7b2f8a1e` di seluruh `lib/` mengembalikan nol hasil.
 - [ ] **[BARU — F-11b/F-12b/F-13b]** `BtidCredentialModel.fromJson` tidak memiliki default James Wilson / BTID statis / DOB palsu; `AuditTransactionModel.fromJson` tidak memiliki default James Wilson; grep `btid_credential_model.dart` dan `audit_transaction_model.dart` untuk literal palsu mengembalikan nol hasil.
-- [ ] **[BARU — F-14b]** `qr_scanner_screen.dart` dan `policy_matrix_constants.dart` tidak mengandung MCH-3311/MCH-5520/`coffee`/`tour` di build prod.
+- [x] **[BARU — F-14b]** `qr_scanner_screen.dart` dan `policy_matrix_constants.dart` tidak mengandung MCH-3311/MCH-5520/`coffee`/`tour` di build prod.
 - [ ] **[BARU — F-15b]** Ketiga titik pemanggilan `triggerMerchantSimulation` dihapus dari build staging/prod; tidak ada di `tab_home.dart`, `tab_explore.dart`, `dynamic_qr_screen.dart`.
 - [ ] **[BARU — F-21]** Tidak ada `catch (_) {}` kosong di `lib/`; semua exception tertangani dengan `AppFailure` bertipe atau masuk outbox.
 

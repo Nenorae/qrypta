@@ -76,3 +76,12 @@ class TxPendingTimeout extends AppFailure {
 class ValidationFailure extends AppFailure {
   const ValidationFailure(super.message);
 }
+
+/// Merchant tidak terdaftar di resolver backend ezsign-core (Phase 6 / D-4).
+class MerchantNotRegistered extends AppFailure {
+  final String? nmid;
+  const MerchantNotRegistered(super.message, [this.nmid]);
+
+  @override
+  String toString() => 'MerchantNotRegistered(nmid: $nmid): $message';
+}

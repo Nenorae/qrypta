@@ -10,6 +10,7 @@ import 'package:qrypta/src/core/services/blockchain/verification_transaction_ser
 import 'package:qrypta/src/core/utils/formatters.dart';
 import 'package:qrypta/src/features/transaction/logic/payment_controller.dart';
 import 'package:qrypta/src/features/verification/data/policy_matrix_constants.dart';
+import 'fixtures/demo_merchants_fixture.dart';
 
 void main() {
   group('Milestone 5 - Tourist Levy & QRIS Audit Logging Tests', () {
@@ -170,12 +171,12 @@ void main() {
     });
 
     test('Demo merchant addresses for QRIS are configured and valid EVM hex', () {
-      final cafe = demoMerchants['cafe']!;
+      final cafe = stagingDemoMerchants['cafe']!;
       expect(cafe.id, equals('MCH-3311'));
       expect(cafe.walletAddress.startsWith('0x'), isTrue);
       expect(cafe.walletAddress.length, equals(42));
 
-      final tour = demoMerchants['tour']!;
+      final tour = stagingDemoMerchants['tour']!;
       expect(tour.id, equals('MCH-5520'));
       expect(tour.walletAddress.startsWith('0x'), isTrue);
       expect(tour.walletAddress.length, equals(42));

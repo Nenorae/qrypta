@@ -8,6 +8,7 @@ import 'package:qrypta/src/core/data/models/audit_transaction_model.dart';
 import 'package:qrypta/src/core/data/models/consent_request_model.dart';
 import 'package:qrypta/src/core/services/blockchain/verification_transaction_service.dart';
 import 'package:qrypta/src/features/verification/data/policy_matrix_constants.dart';
+import 'fixtures/demo_merchants_fixture.dart';
 
 void main() {
   const testPrivateKeyHex =
@@ -95,18 +96,18 @@ void main() {
     });
 
     test('Demo merchants map accurately reflects ecosystem partners', () {
-      expect(DEMO_MERCHANTS.length, 5);
-      final hotel = DEMO_MERCHANTS['hotel']!;
+      expect(stagingDemoMerchants.length, 5);
+      final hotel = stagingDemoMerchants['hotel']!;
       expect(hotel.id, 'MCH-1042');
       expect(hotel.name, 'Bali Ocean Resort');
       expect(hotel.defaultTemplate, 'hotel_checkin');
 
-      final car = DEMO_MERCHANTS['car']!;
+      final car = stagingDemoMerchants['car']!;
       expect(car.id, 'MCH-2087');
       expect(car.name, 'Island Drive Car Rental');
       expect(car.defaultTemplate, 'vehicle_rental');
 
-      final cafe = DEMO_MERCHANTS['cafe']!;
+      final cafe = stagingDemoMerchants['cafe']!;
       expect(cafe.id, 'MCH-3311');
       expect(cafe.defaultTemplate, 'age_check');
     });

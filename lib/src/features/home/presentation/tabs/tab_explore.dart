@@ -18,7 +18,7 @@ class _TabExploreState extends ConsumerState<TabExplore> {
 
   @override
   Widget build(BuildContext context) {
-    final allMerchants = demoMerchants.values.toList();
+    final allMerchants = accreditedMerchants.values.toList();
     final filteredMerchants = _selectedCategory == 'all'
         ? allMerchants
         : allMerchants.where((m) => m.category == _selectedCategory).toList();
@@ -82,11 +82,11 @@ class _TabExploreState extends ConsumerState<TabExplore> {
   Widget _buildFilterChips() {
     final filters = [
       {'id': 'all', 'label': 'All'},
-      {'id': 'hotel', 'label': 'Stay'},
-      {'id': 'cafe', 'label': 'Eat & Drink'},
-      {'id': 'car', 'label': 'Drive'},
-      {'id': 'esim', 'label': 'Connect'},
-      {'id': 'tour', 'label': 'Tours'},
+      {'id': categoryHotel, 'label': 'Stay'},
+      {'id': categoryCafe, 'label': 'Eat & Drink'},
+      {'id': categoryCar, 'label': 'Drive'},
+      {'id': categoryEsim, 'label': 'Connect'},
+      {'id': categoryTour, 'label': 'Tours'},
     ];
 
     return SingleChildScrollView(
@@ -150,19 +150,19 @@ class _TabExploreState extends ConsumerState<TabExplore> {
     IconData categoryIcon = Icons.storefront_rounded;
     Color iconColor = const Color(0xFF2DD4BF);
 
-    if (merchant.category == 'hotel') {
+    if (merchant.category == categoryHotel) {
       categoryIcon = Icons.hotel_rounded;
       iconColor = const Color(0xFF38BDF8);
-    } else if (merchant.category == 'car') {
+    } else if (merchant.category == categoryCar) {
       categoryIcon = Icons.directions_car_rounded;
       iconColor = const Color(0xFFFBBF24);
-    } else if (merchant.category == 'cafe') {
+    } else if (merchant.category == categoryCafe) {
       categoryIcon = Icons.local_cafe_rounded;
       iconColor = const Color(0xFFA78BFA);
-    } else if (merchant.category == 'esim') {
+    } else if (merchant.category == categoryEsim) {
       categoryIcon = Icons.sim_card_rounded;
       iconColor = const Color(0xFF34D399);
-    } else if (merchant.category == 'tour') {
+    } else if (merchant.category == categoryTour) {
       categoryIcon = Icons.landscape_rounded;
       iconColor = const Color(0xFFF43F5E);
     }

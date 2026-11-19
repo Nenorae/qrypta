@@ -1,22 +1,26 @@
+// lib/src/features/qr_scanner/presentation/screens/qr_scanner_screen.dart
 
-import 'dart:convert';
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
-import 'package:qrypta/src/features/transaction/presentation/screens/send_screen.dart';
+import 'package:qrypta/src/core/error/app_failure.dart';
+import 'package:qrypta/src/core/providers/merchant_providers.dart';
+import 'package:qrypta/src/core/services/qr/qr_payload_router.dart';
+import 'package:qrypta/src/features/transaction/presentation/screens/qris_payment_screen.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/receive_screen.dart';
 import 'package:qrypta/src/features/transaction/presentation/screens/send_scanner_screen.dart';
-import 'package:qrypta/src/features/transaction/presentation/screens/qris_payment_screen.dart';
-import 'package:qrypta/src/features/verification/data/policy_matrix_constants.dart';
+import 'package:qrypta/src/features/transaction/presentation/screens/send_screen.dart';
 
-class QrScannerScreen extends StatefulWidget {
+/// Layar pemindai QR mandiri untuk Tab Scan (Phase 6 / F-14b).
+/// Menggunakan `QrPayloadRouter` murni dan resolusi merchant otoritatif.
+class QrScannerScreen extends ConsumerStatefulWidget {
   const QrScannerScreen({super.key});
 
   @override
-  State<QrScannerScreen> createState() => _QrScannerScreenState();
+  ConsumerState<QrScannerScreen> createState() => _QrScannerScreenState();
 }
 
-class _QrScannerScreenState extends State<QrScannerScreen> {
+class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
 
@@ -37,116 +41,129 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     );
   }
 
-  void _handleScannedData(BuildContext context, String rawData) {
+  Future<void> _handleScannedData(BuildContext context, String rawData) async {
     try {
-      if (rawData.startsWith('{') && rawData.endsWith('}')) {
-        final decoded = jsonDecode(rawData);
-        final type = decoded['type']?.toString().toUpperCase();
-        if (type == 'QRIS' ||
-            decoded.containsKey('merchantId') ||
-            decoded.containsKey('amount')) {
-          final merchantName = decoded['merchantName'] ??
-              decoded['name'] ??
-              'Bali Coffee House - Canggu';
-          final merchantId =
-              decoded['merchantId'] ?? decoded['id'] ?? 'MCH-3311';
-          final merchantAddress = decoded['address'] ??
-              decoded['walletAddress'] ??
-              '0x3311A9908F8718E237aDE73708aB59f212284bE0';
-          final amount =
-              int.tryParse(decoded['amount']?.toString() ?? '85000') ?? 85000;
-          final desc = decoded['description'] ??
-              decoded['desc'] ??
-              'Merchant Settlement';
+      final routeResult = await QrPayloadRouter.routeAsync(rawData);
+
+      if (!mounted) return;
+
+      switch (routeResult) {
+        case QrisRoute(:final qris):
+          final nmid = qris.nmid;
+          if (nmid == null || nmid.isEmpty) {
+            _showErrorDialog(
+              title: 'QRIS Tidak Lengkap',
+              message:
+                  'Kode QRIS tidak memuat National Merchant ID (NMID) yang valid.',
+            );
+            return;
+          }
+
+          // Resolusi merchant via ezsign-core konsorsium (Phase 6.3 / D-4)
+          final resolver = ref.read(merchantResolverServiceProvider);
+          final resolved = await resolver.resolve(nmid: nmid);
+
+          if (!mounted) return;
 
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => QrisPaymentScreen(
-                merchantName: merchantName,
-                merchantId: merchantId,
-                merchantAddress: merchantAddress,
-                initialAmount: amount,
-                itemDescription: desc,
+                merchantName: resolved.displayName,
+                merchantId: resolved.merchantId,
+                merchantAddress: resolved.walletAddress,
+                initialAmount: (qris.transactionAmount ?? 0.0).toInt(),
+                itemDescription: qris.additionalData?.storeLabel ??
+                    qris.additionalData?.billNumber ??
+                    'Pembayaran QRIS Merchant',
+                isAmountLocked: qris.isDynamic,
               ),
             ),
           );
           return;
-        }
-      }
-    } on Object catch (e) {
-      developer.log('Format JSON QR tidak dikenali: $e', name: 'QrScannerScreen');
-    }
 
-    // Check by known merchant identifiers
-    if (rawData.contains('MCH-3311') || rawData.toLowerCase().contains('coffee')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const QrisPaymentScreen(
-            merchantName: 'Bali Coffee House - Canggu',
-            merchantId: 'MCH-3311',
-            merchantAddress: '0x3311A9908F8718E237aDE73708aB59f212284bE0',
-            initialAmount: 85000,
-            itemDescription: 'Specialty Coffee & Pastry',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (rawData.contains('MCH-5520') || rawData.toLowerCase().contains('tour')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const QrisPaymentScreen(
-            merchantName: 'Bali Adventure Tours',
-            merchantId: 'MCH-5520',
-            merchantAddress: '0x5520e5ff38a7c645bcf56b823e590d9a6c9cf141',
-            initialAmount: 350000,
-            itemDescription: 'Mount Batur Sunrise Trek',
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Check by known EVM merchant address
-    if (rawData.startsWith('0x') && rawData.length == 42) {
-      final merchant = demoMerchants.values
-          .where((m) => m.walletAddress.toLowerCase() == rawData.toLowerCase())
-          .firstOrNull;
-      if (merchant != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => QrisPaymentScreen(
-              merchantName: merchant.name,
-              merchantId: merchant.id,
-              merchantAddress: merchant.walletAddress,
-              initialAmount: merchant.category == 'cafe' ? 85000 : 150000,
-              itemDescription: 'Merchant QRIS Service',
+        case WalletAddressRoute(:final address):
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SendScreen(initialAddress: address),
             ),
-          ),
-        );
-        return;
+          );
+          return;
+
+        case NativeQryptaRoute(:final type):
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('QR Native Qrypta terdeteksi: $type'),
+              backgroundColor: const Color(0xFF0F766E),
+            ),
+          );
+          return;
       }
-
-      // Standalone EVM Transfer
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SendScreen(initialAddress: rawData),
-        ),
+    } on MerchantNotRegistered catch (e) {
+      if (!mounted) return;
+      _showErrorDialog(
+        title: 'Merchant Belum Terdaftar',
+        message:
+            '${e.message}\n\nStiker QRIS fisik terhubung ke rail Rupiah perbankan/PJP. Pembayaran on-chain IDRT hanya diproses untuk merchant mitra konsorsium Qrypta terakreditasi.',
       );
-      return;
+    } on ValidationFailure catch (e) {
+      if (!mounted) return;
+      _showErrorDialog(
+        title: 'QR Tidak Valid',
+        message: e.message,
+      );
+    } on AppFailure catch (e) {
+      if (!mounted) return;
+      _showErrorDialog(
+        title: 'Gagal Menghubungi Server',
+        message: e.message,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog(
+        title: 'Kesalahan Pemindaian',
+        message: 'Gagal memproses kode QR: $e',
+      );
     }
+  }
 
-    // Default Fallback: Open QRIS confirmation screen
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const QrisPaymentScreen(),
+  void _showErrorDialog({
+    required String title,
+    required String message,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded,
+                color: Color(0xFFF43F5E), size: 24),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Tutup', style: TextStyle(color: Color(0xFF2DD4BF))),
+          ),
+        ],
       ),
     );
   }
