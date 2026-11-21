@@ -3,8 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/features/verification/data/policy_matrix_constants.dart';
-import 'package:qrypta/src/features/verification/logic/verification_controller.dart';
-import 'package:qrypta/src/features/verification/presentation/screens/consent_request_screen.dart';
+import 'package:qrypta/src/features/verification/presentation/screens/dynamic_qr_screen.dart';
 
 class TabExplore extends ConsumerStatefulWidget {
   const TabExplore({super.key});
@@ -252,20 +251,23 @@ class _TabExploreState extends ConsumerState<TabExplore> {
             height: 40,
             child: ElevatedButton.icon(
               onPressed: () {
-                final req = ref
-                    .read(verificationControllerProvider.notifier)
-                    .triggerMerchantSimulation(merchant.category);
-
+                // Tampilkan Dynamic QR wisatawan kepada merchant (Phase 7.2 / F-15b)
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ConsentRequestScreen(request: req),
+                    builder: (context) => const DynamicQrScreen(),
+                  ),
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Tunjukkan Dynamic QR Anda kepada ${merchant.name} untuk diverifikasi secara real-time.'),
+                    backgroundColor: const Color(0xFF0F766E),
                   ),
                 );
               },
-              icon: const Icon(Icons.fingerprint_rounded, size: 18),
+              icon: const Icon(Icons.qr_code_2_rounded, size: 18),
               label: const Text(
-                'Simulate Verification Handshake',
+                'Show Dynamic QR to Merchant',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(

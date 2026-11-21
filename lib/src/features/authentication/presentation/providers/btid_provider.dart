@@ -45,6 +45,8 @@ final holderProfileProvider = Provider<HolderProfile?>((ref) {
 });
 
 class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
+  String? _lastStorageError;
+
   BtidCredentialNotifier() : super(null) {
     loadCredential();
   }
@@ -77,6 +79,7 @@ class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
         }
       } on Object catch (e2) {
         developer.log('SharedPreferences loadCredential failed: $e2', name: 'BtidProvider');
+        _lastStorageError = e2.toString();
       }
     }
   }
@@ -98,6 +101,7 @@ class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
         await prefs.setString(_btidStorageKey, jsonEncode(credential.toJson()));
       } on Object catch (e2) {
         developer.log('SharedPreferences saveCredential failed: $e2', name: 'BtidProvider');
+        _lastStorageError = e2.toString();
       }
     }
   }
@@ -124,6 +128,7 @@ class BtidCredentialNotifier extends StateNotifier<BtidCredentialModel?> {
       }
     } on Object catch (e) {
       developer.log('Hive clearCredential failed: $e', name: 'BtidProvider');
+      _lastStorageError = e.toString();
     }
   }
 }

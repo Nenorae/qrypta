@@ -21,6 +21,9 @@ class BtidIssuanceService {
   final String _baseUrl;
   static const String _serviceName = 'BtidIssuanceService';
   static const String defaultPassportSalt = 'QRYPTA_PASSPORT_SALT_2026';
+  String? _lastLookupError;
+
+  String? get lastLookupError => _lastLookupError;
 
   BtidIssuanceService({
     http.Client? httpClient,
@@ -82,6 +85,7 @@ class BtidIssuanceService {
         'Immigration lookup transient failure (falling back to self_declared): $e',
         name: _serviceName,
       );
+      _lastLookupError = e.toString();
     }
 
     return const ImmigrationData(

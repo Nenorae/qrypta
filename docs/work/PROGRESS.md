@@ -18,8 +18,8 @@
 | **Phase 4** | **Consent, Revocation & Financial Audit Nyata** | **5 h** | **✅ Selesai** | **F-05, F-06, F-07, F-12, F-12b, F-21 tuntas: outbox offline queue, zero-PII ActorRef, sanitasi James Wilson & catch kosong.** |
 | **Phase 5A** | **Mesin OCR MRZ Paspor Nyata (Google ML Kit Text Recognition)** | **6-8 h** | **✅ Selesai** | **F-01, F-19, F-23 tuntas: kamera optik asli ML Kit, MrzExtractor, MrzFrameConsensus, eliminasi MobileScanner & bypass demo, input manual ICAO.** |
 | **Phase 5B** | **Penerbitan BTID Otoritatif & Sanitasi Data Identitas** | **4 h** | **✅ Selesai** | **F-08, F-11, F-11b, F-13, F-13b tuntas: penerbitan server otoritatif, eliminasi BTID & DOB statis, Zero-PII passportHash HMAC-SHA256, HolderProfile.** |
-| Phase 6 | Parser Standar QRIS EMVCo TLV & Validasi CRC16-CCITT | 4-5 h | ⬜ Belum | F-14, F-14b (eliminasi string match coffee/tour). |
-| Phase 7 | Merchant Handshake Dua Arah Nyata (WebSocket/SSE + Push) | 7-9 h | ⬜ Belum | F-15, F-15b (eliminasi timer in-app simulation). |
+| **Phase 6** | **Parser Standar QRIS EMVCo TLV & Validasi CRC16-CCITT** | **4-5 h** | **✅ Selesai** | **F-14, F-14b, F-24 tuntas: eliminasi string match coffee/tour/MCH, background Isolate.run, 32 real QRIS fixtures.** |
+| **Phase 7** | **Merchant Handshake Dua Arah Nyata (WebSocket/SSE + Push)** | **7-9 h** | **✅ Selesai** | **F-15, F-15b tuntas: RealtimeChannelService (WS+HTTP sync), PushNotificationService, Dynamic QR canonical secp256k1 signature, eliminasi triggerMerchantSimulation dari UI & logic, CLI tools/merchant_sim.** |
 | Phase 8 | Pembacaan Chip e-Passport NFC & Passive Authentication (PA) | 10-15 h | ⬜ Belum | F-17 (bergantung keputusan D-1). |
 | Phase 9 | Pelabelan Eksplisit Simulasi Liveness Wajah | 1 h | ⬜ Belum | F-18 (satu-satunya dummy resmi, wajib berlabel SIMULASI). |
 | Phase 10 | Pengujian Lapangan Lintas Level (L1-L4) & Reality Gate Final | +4 h | ⬜ Belum | Verifikasi HP fisik, receipt explorer, no mock claim. |
@@ -52,11 +52,11 @@
 | **F-12b** | `James Wilson` tertanam di DTO model, factory MRZ parser, dan UI screens | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | James Wilson dieliminasi 100% dari seluruh `lib/` (grep: 0 hit). demoJamesWilson dipindah ke test/fixtures/. | 2026-11-18 |
 | **F-13** | Default imigrasi (DOB, expiry, visaType) di `btid_issued_screen.dart` | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi. DOB dan docExpiry diambil strictly dari MRZ dan dicek kedaluwarsa; visaType dari backend imigrasi. | 2026-11-19 |
 | **F-13b** | Default imigrasi (`1988-04-12`, `2031-08-15`, `e-VOA B1`) tertanam di DTO model | Tinggi | 5B | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `btid_credential_model.dart` (wajib di fromJson, throw FormatException) & policy_matrix (0 hit grep di lib/). | 2026-11-19 |
-| **F-14** | Parser QRIS EMVCo TLV tidak ada; string match 'coffee'/'tour'/MCH di `tab_pay.dart` | Tinggi | 6 | ⬜ Belum | - | Terverifikasi di `tab_pay.dart:25,53,69`. | 2026-11-17 |
-| **F-14b** | Duplikasi logika string match di `qr_scanner_screen.dart` & `policy_matrix_constants` | Tinggi | 6 | ⬜ Belum | - | Terverifikasi di `qr_scanner_screen.dart:51,79,95`. | 2026-11-17 |
-| **F-15** | Handshake merchant hanya simulasi in-app berbasis delay timer | Tinggi | 7 | ⬜ Belum | - | Terverifikasi di `verification_controller.dart:148`. Tidak ada koneksi transport. | 2026-11-17 |
-| **F-15b** | Pemanggilan `triggerMerchantSimulation` tersebar di 3 lokasi UI | Tinggi | 7 | ⬜ Belum | - | Terverifikasi di `tab_home.dart:633`, `tab_explore.dart:257`, `dynamic_qr_screen.dart:31`. | 2026-11-17 |
-| **F-16** | 43 test suite lulus hanya unit test + `MockClient` (ilusi coverage) | Tinggi | 10 | ⬜ Belum | - | Terverifikasi: 43 unit test lulus via MockClient tanpa pengujian RPC/server nyata. | 2026-11-17 |
+| **F-14** | Parser QRIS EMVCo TLV tidak ada; string match 'coffee'/'tour'/MCH di `tab_pay.dart` | Tinggi | 6 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi. Digantikan QrisParser murni rekursif TLV + validasi integritas CRC16/CCITT-FALSE di isolate. | 2026-11-19 |
+| **F-14b** | Duplikasi logika string match di `qr_scanner_screen.dart` & `policy_matrix_constants` | Tinggi | 6 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari seluruh features. QrPayloadRouter deterministik dan MerchantResolverService konsorsium. | 2026-11-19 |
+| **F-15** | Handshake merchant hanya simulasi in-app berbasis delay timer | Tinggi | 7 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi. Membangun RealtimeChannelService (WebSocket + HTTP sync fallback) dan PushNotificationService. | 2026-11-20 |
+| **F-15b** | Pemanggilan `triggerMerchantSimulation` tersebar di 3 lokasi UI | Tinggi | 7 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `tab_home.dart`, `tab_explore.dart`, `dynamic_qr_screen.dart`, dan controller. 0 hit grep di lib/. | 2026-11-20 |
+| **F-16** | 43 test suite lulus hanya unit test + `MockClient` (ilusi coverage) | Tinggi | 10 | 🔄 Dalam pengerjaan | Branch `fix/real-behavior` | Pengujian berjenjang aktif: L1 (unit), L2 (integrasi nyata), L3 (chaos/ketahanan). Total 170 tests lulus. | 2026-11-20 |
 | **F-17** | Modul pembacaan chip NFC & Passive Authentication hanya simulasi timer | Sedang | 8 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:102,420`. | 2026-11-17 |
 | **F-18** | Liveness wajah dummy skor 98.7% tanpa label simulasi | Rendah | 9 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:790` (MATCH SCORE: 98.7%). | 2026-11-17 |
 | **F-19** | Tombol "Fast Demo Mode" di welcome screen & factory `demoJamesWilson()` di `lib/` | Kritis | 0/5A | ✅ Selesai | Branch `fix/real-behavior` | Tombol Fast Demo Mode dan shortcut demo dihapus dari seluruh onboarding; factory dipindah ke `test/fixtures/`. | 2026-11-18 |
@@ -64,7 +64,7 @@
 | **F-21** | Blok `catch (_) {}` kosong total tanpa logging ditemukan di 14 titik | Tinggi | 2/3/4 | ✅ Selesai | Branch `fix/real-behavior` | Seluruh blok catch kosong di `lib/` telah disanitasi 100% (grep: 0 hit). Check Reality Guard hijau. | 2026-11-18 |
 | **F-22** | Android Manifest tidak mendeklarasikan izin `CAMERA` & `NFC` di manifest utama | Tinggi | 1/5A/8 | ✅ Selesai (Kamera) | Branch `fix/real-behavior` | Izin `CAMERA` telah aktif di manifest dan dikelola via runtime `permission_handler` di `mrz_scanner_screen.dart`. | 2026-11-18 |
 | **F-23** | Dependensi `camera` tidak terpasang di `pubspec.yaml` untuk frame OCR ML Kit | Kritis | 5A | ✅ Selesai | Branch `fix/real-behavior` | Terpasang `camera: ^0.12.2` & `permission_handler: ^13.0.2` di `pubspec.yaml`. | 2026-11-18 |
-| **F-24** | Tombol quick test di `send_scanner_screen.dart` memuat fixture JSON merchant statis | Sedang | 6 | ⬜ Belum | - | Terverifikasi di `send_scanner_screen.dart:143,186`. | 2026-11-17 |
+| **F-24** | Tombol quick test di `send_scanner_screen.dart` memuat fixture JSON merchant statis | Sedang | 6 | ✅ Selesai | Branch `fix/real-behavior` | Tombol simulasi injeksi payload demo dihapus dari send_scanner_screen.dart. | 2026-11-19 |
 
 ---
 
@@ -155,3 +155,17 @@
 - **Koleksi Fixture Representatif 32 QRIS Riil:** Membuat `test/fixtures/qris_fixtures.dart` yang memuat 32 payload QRIS riil terverifikasi CRC16 bit-level (statis, dinamis, berbagai acquirer perbankan nasional & dompet digital: BCA, Mandiri, BRI, BNI, BPD Bali, GoPay, OVO, DANA, ShopeePay, LinkAja, Nobu, CIMB, Permata, Danamon, BSI, Netzme, Xendit, DOKU, OttoPay, KasPro).
 - **Pengujian Unit & Integrasi L1 & L2 (Phase 6.5):** Dibuat 26 pengujian komprehensif di `test/phase6_qris_parser_test.dart` (32 fixture parsing, ekstraksi statis/dinamis/tip/fee, pengujian isolate, 10 uji negatif CRC/panjang/mata uang/negara, 300 iterasi fuzzing mutasi bit-flip acak, routing deterministik, dan resolusi merchant L2). Total pengujian aktif seluruh proyek kini **157/157 lulus 100% (0 failed)**.
 - **Status Akhir Phase 6:** Selesai 100%. Siap melangkah ke Phase 7 (Handshake Merchant Dua Arah & WebSocket/FCM).
+
+### 20 November 2026 - Phase 7 Execution
+- **Spesifikasi Protokol Handshake & Tanda Tangan Kriptografis Dynamic QR (Phase 7.1 / F-15):** Memperbarui generator Dynamic QR 45 detik di `VerificationTransactionService` untuk menyertakan skema canonical `{v, sessionId, nonce, exp, wallet, btid, token, sig}` yang ditandatangani menggunakan kunci privat dompet wisatawan via `signPersonalMessageToUint8List`. Membangun validator statis `verifyDynamicQrToken` dengan pemulihan kunci publik `ecRecover` dan pencegahan kedaluwarsa ketat.
+- **Layanan Kanal Dua Arah Real-Time (`RealtimeChannelService` - Phase 7.2 #1 / F-15):** Membangun layanan WebSocket/SSE dengan rekoneksi eksponensial otomatis (1s s/d 30s), heartbeat berkala (ping setiap 25s), pemulihan pesan terlewat via endpoint REST `GET /verification/requests?since=`, serta cadangan polling berkala saat soket offline.
+- **Layanan Push Notification Background (`PushNotificationService` - Phase 7.2 #2):** Membangun modul integrasi token FCM ke endpoint backend `POST /notifications/register-token` dan handler pesan background yang membuka layar persetujuan atribut secara langsung.
+- **Eliminasi Total Simulasi In-App `triggerMerchantSimulation` (Phase 7.2 #3 & F-15b):**
+  - Menghapus method `triggerMerchantSimulation` 100% dari `VerificationController`.
+  - Menghapus tombol shortcut simulasi dari `dynamic_qr_screen.dart` dan menggantikannya dengan kartu status koneksi WebSocket real-time dan listener navigasi otomatis ke `ConsentRequestScreen`.
+  - Menghapus pemanggilan simulasi dari `tab_home.dart:638` dan `tab_explore.dart:257`, mengalihkannya untuk menampilkan Dynamic QR kepada merchant asli.
+  - Check Reality Guard CI `F-15b` dan Check 6 kini berstatus **HIJAU** (0 hit grep di seluruh `lib/`).
+- **Alat Penguji Merchant Standalone (`tools/merchant_sim/merchant_sim.dart` - Phase 7.3):** Membangun CLI eksternal independen yang berperan sebagai terminal pemindai merchant: memvalidasi struktur QR dan signature secp256k1, mengirimkan `POST /verification/requests` ke server, dan memantau status persetujuan wisatawan secara real-time melalui jaringan.
+- **Sanitasi Silent Catch & Integritas Reality Guard (Golden Rule R1):** Membersihkan seluruh catch yang hanya memuat `developer.log` di seluruh basis kode `lib/`. `bash tools/reality_guard.sh` kini **HIJAU 100% (Seluruh 12 aturan lolos)**.
+- **Pengujian Unit, Integrasi & Chaos L1/L2/L3 (Phase 7.4):** Dibuat 13 pengujian komprehensif di `test/phase7_merchant_handshake_test.dart` (validasi signature/exp, websocket subscription, event streaming, filtering duplikat/expired, HTTP sync fallback, chaos disconnect backoff, registrasi push, dan end-to-end handshake flow). Total pengujian aktif seluruh proyek kini **170/170 lulus 100% (0 failed)**.
+- **Status Akhir Phase 7:** Selesai 100%. Siap melangkah ke Phase 8 (NFC Chip Read & Passive Authentication).

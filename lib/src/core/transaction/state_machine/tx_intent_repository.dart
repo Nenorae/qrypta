@@ -12,6 +12,9 @@ class TxIntentRepository {
 
   final Box? _injectedBox;
   final Map<String, TxIntent> _memoryFallback = {};
+  String? _lastStorageError;
+
+  String? get lastStorageError => _lastStorageError;
 
   TxIntentRepository({Box? box}) : _injectedBox = box;
 
@@ -31,6 +34,7 @@ class TxIntentRepository {
       await box.put(intent.intentId, intent.toJson());
     } on Object catch (e) {
       developer.log('Penyimpanan Hive gagal, tersimpan di memori fallback: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
   }
 
@@ -44,6 +48,7 @@ class TxIntentRepository {
       }
     } on Object catch (e) {
       developer.log('Pembacaan intent dari Hive gagal: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
     return _memoryFallback[intentId];
   }
@@ -88,6 +93,7 @@ class TxIntentRepository {
       }
     } on Object catch (e) {
       developer.log('Pengambilan seluruh intent dari Hive gagal: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
 
     final list = results.values.toList();
@@ -103,6 +109,7 @@ class TxIntentRepository {
       await box.delete(intentId);
     } on Object catch (e) {
       developer.log('Penghapusan intent dari Hive gagal: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
   }
 }

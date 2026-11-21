@@ -11,6 +11,9 @@ class OutboxRepository {
 
   final Box? _injectedBox;
   final Map<String, OutboxItem> _memoryFallback = {};
+  String? _lastStorageError;
+
+  String? get lastStorageError => _lastStorageError;
 
   OutboxRepository({Box? box}) : _injectedBox = box;
 
@@ -30,6 +33,7 @@ class OutboxRepository {
       await box.put(item.id, item.toJson());
     } on Object catch (e) {
       developer.log('Penyimpanan item outbox gagal, tersimpan di memori fallback: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
   }
 
@@ -41,6 +45,7 @@ class OutboxRepository {
       await box.put(item.id, item.toJson());
     } on Object catch (e) {
       developer.log('Pembaruan item outbox gagal: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
   }
 
@@ -68,6 +73,7 @@ class OutboxRepository {
       }
     } on Object catch (e) {
       developer.log('Pengambilan seluruh outbox dari Hive gagal: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
 
     final list = results.values.toList();
@@ -85,6 +91,7 @@ class OutboxRepository {
       }
     } on Object catch (e) {
       developer.log('Pengambilan item outbox gagal: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
     return _memoryFallback[id];
   }
@@ -97,6 +104,7 @@ class OutboxRepository {
       await box.delete(id);
     } on Object catch (e) {
       developer.log('Penghapusan item outbox gagal: $e', name: _logTag);
+      _lastStorageError = e.toString();
     }
   }
 }

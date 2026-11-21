@@ -79,6 +79,7 @@ class AuditMigrationService {
       );
     } on Object catch (e) {
       developer.log('Gagal menjalankan migrasi audit store: $e', name: _logTag);
+      rethrow;
     }
 
     return AuditMigrationReport(

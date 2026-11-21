@@ -635,10 +635,16 @@ class TabHome extends ConsumerWidget {
               onTap: () {
                 final id = svc['id'] as String;
                 if (id == 'hotel' || id == 'esim' || id == 'car') {
-                  final req = ref.read(verificationControllerProvider.notifier).triggerMerchantSimulation(id);
+                  // Arahkan wisatawan untuk menampilkan Dynamic QR kepada merchant resmi (Phase 7.2 / F-15b)
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ConsentRequestScreen(request: req)),
+                    MaterialPageRoute(builder: (context) => const DynamicQrScreen()),
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Tunjukkan Dynamic QR Anda kepada merchant ${svc['label']} untuk memulai verifikasi real-time.'),
+                      backgroundColor: const Color(0xFF0F766E),
+                    ),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(

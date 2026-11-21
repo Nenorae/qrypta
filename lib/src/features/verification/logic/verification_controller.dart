@@ -3,15 +3,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qrypta/src/core/data/models/actor_ref.dart';
 import 'package:qrypta/src/core/data/models/audit_transaction_model.dart';
 import 'package:qrypta/src/core/data/models/consent_request_model.dart';
+import 'package:qrypta/src/core/providers/realtime_providers.dart';
 import 'package:qrypta/src/core/services/blockchain/blockchain_service.dart';
 import 'package:qrypta/src/core/services/blockchain/verification_transaction_service.dart';
+import 'package:qrypta/src/core/services/realtime/realtime_channel_service.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/btid_provider.dart';
-import 'package:qrypta/src/features/verification/data/policy_matrix_constants.dart';
 
 class VerificationState {
   final String currentQrToken;
@@ -81,27 +81,51 @@ class VerificationState {
 final verificationControllerProvider =
     StateNotifierProvider<VerificationNotifier, VerificationState>((ref) {
   final verificationService = ref.watch(blockchainServiceProvider).verification;
-  return VerificationNotifier(ref, verificationService);
+  final realtimeService = ref.watch(realtimeChannelServiceProvider);
+  return VerificationNotifier(ref, verificationService, realtimeService: realtimeService);
 });
 
 class VerificationNotifier extends StateNotifier<VerificationState> {
   final Ref ref;
   final VerificationTransactionService _verificationService;
+  final RealtimeChannelService? _realtimeService;
   Timer? _countdownTimer;
+  StreamSubscription? _requestSubscription;
 
-  VerificationNotifier(this.ref, this._verificationService)
-      : super(const VerificationState()) {
+  VerificationNotifier(
+    this.ref,
+    this._verificationService, {
+    RealtimeChannelService? realtimeService,
+  })  : _realtimeService = realtimeService,
+        super(const VerificationState()) {
+    _initRealtimeListener();
     loadAuditHistory();
+  }
+
+  void _initRealtimeListener() {
+    _requestSubscription?.cancel();
+    if (_realtimeService != null) {
+      _requestSubscription = _realtimeService!.requestStream.listen((request) {
+        if (!request.isExpired) {
+          state = state.copyWith(activeConsentRequest: request);
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _requestSubscription?.cancel();
     super.dispose();
   }
 
-  /// Memulai atau memperbarui QR Dinamis 45 Detik
-  void startOrRefreshQr({String? btid, String? walletAddress}) {
+  /// Memulai atau memperbarui QR Dinamis 45 Detik (Phase 7.1)
+  Future<void> startOrRefreshQr({
+    String? btid,
+    String? walletAddress,
+    String? privateKeyHex,
+  }) async {
     _countdownTimer?.cancel();
 
     final cred = ref.read(btidCredentialProvider);
@@ -118,9 +142,18 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
       return;
     }
 
+    // Sambungkan kanal real-time untuk mendengarkan permintaan merchant (Phase 7.2 #1)
+    if (_realtimeService != null) {
+      await _realtimeService!.connect(
+        walletAddress: activeWallet,
+        btid: activeBtid,
+      );
+    }
+
     final jsonPayload = _verificationService.generateDynamicQrToken(
       activeBtid,
       activeWallet,
+      privateKeyHex: privateKeyHex,
       validitySeconds: 45,
     );
 
@@ -130,6 +163,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
       extractedToken = decoded['token']?.toString() ?? extractedToken;
     } on Object catch (e) {
       developer.log('Gagal decode payload QR token: $e', name: 'VerificationController');
+      state = state.copyWith(errorMessage: 'Gagal decode payload QR token: $e');
     }
 
     state = state.copyWith(
@@ -155,34 +189,11 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
     });
   }
 
-  /// Memicu simulasi merchant scan (Hotel, Car Rental, Cafe, dll.) untuk keperluan presentasi & pengujian
-  ConsentRequestModel triggerMerchantSimulation(String category) {
-    final merchant = DEMO_MERCHANTS[category] ?? DEMO_MERCHANTS['hotel']!;
-    final template = TEMPLATES[merchant.defaultTemplate] ?? TEMPLATES['hotel_checkin']!;
-    final rand = Random();
-    final reqId = 'TX-${100000 + rand.nextInt(900000)}';
-
-    // Menggabungkan core fields dan 1-2 optional fields
-    final fields = List<String>.from(template.coreFields);
-    if (template.optionalFields.isNotEmpty && fields.length < 8) {
-      fields.add(template.optionalFields.first);
+  /// Menerima permintaan consent dari kanal eksternal (WebSocket / Push Notification / Scanner Merchant Nyata)
+  void handleIncomingConsentRequest(ConsentRequestModel request) {
+    if (!request.isExpired) {
+      state = state.copyWith(activeConsentRequest: request);
     }
-
-    final request = ConsentRequestModel(
-      requestId: reqId,
-      merchantId: merchant.id,
-      merchantName: merchant.name,
-      merchantCategory: merchant.category,
-      staffName: merchant.staffName,
-      staffRole: merchant.staffRole,
-      purposeTemplate: template.id,
-      requestedFields: fields,
-      retentionPolicy: template.retentionPolicy,
-      expiresAt: DateTime.now().add(const Duration(minutes: 3)),
-    );
-
-    state = state.copyWith(activeConsentRequest: request);
-    return request;
   }
 
   /// Menyetujui dan menandatangani cryptographic consent
@@ -300,6 +311,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
       state = state.copyWith(auditHistory: list);
     } on Object catch (e) {
       developer.log('Gagal memuat riwayat audit: $e', name: 'VerificationController');
+      state = state.copyWith(errorMessage: 'Gagal memuat riwayat audit: $e');
     }
   }
 

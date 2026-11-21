@@ -37,11 +37,14 @@ class VerificationTransactionService {
 
   Web3Client? get web3Client => _web3Client;
 
-  /// Generates a rotating ephemeral dynamic QR token (strictly 45s validity).
+  /// Generates a rotating ephemeral dynamic QR token (strictly 45s validity per Phase 7.1).
   String generateDynamicQrToken(
     String btid,
     String walletAddress, {
     int validitySeconds = 45,
+    String? privateKeyHex,
+    String? customSessionId,
+    String? customNonce,
   }) {
     if (btid.isEmpty) {
       throw const ValidationFailure('BTID tidak boleh kosong saat membuat token QR dinamis.');
@@ -53,16 +56,102 @@ class VerificationTransactionService {
       tokenCode.write(chars[random.nextInt(chars.length)]);
     }
 
+    final sessionId = customSessionId ?? UuidUtil.generateV4();
+    final nonceBytes = Uint8List(16);
+    for (int i = 0; i < 16; i++) {
+      nonceBytes[i] = random.nextInt(256);
+    }
+    final nonce = customNonce ?? '0x${bytesToHex(nonceBytes)}';
     final expTimestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000) + validitySeconds;
 
+    String? signatureHex;
+    if (privateKeyHex != null && privateKeyHex.isNotEmpty) {
+      final cleanKey = _cleanHexKey(privateKeyHex);
+      final ethKey = EthPrivateKey.fromHex(cleanKey);
+      final canonicalPayload =
+          'v=1&sessionId=$sessionId&nonce=$nonce&exp=$expTimestamp&wallet=${walletAddress.toLowerCase()}&btid=$btid';
+      final sigBytes = ethKey.signPersonalMessageToUint8List(
+        Uint8List.fromList(utf8.encode(canonicalPayload)),
+      );
+      signatureHex = '0x${bytesToHex(sigBytes)}';
+    }
+
     final payload = {
-      'token': tokenCode.toString(),
-      'btid': btid,
-      'wallet': walletAddress,
+      'v': 1,
+      'sessionId': sessionId,
+      'nonce': nonce,
       'exp': expTimestamp,
+      'wallet': walletAddress,
+      'btid': btid,
+      'token': tokenCode.toString(),
+      if (signatureHex != null) 'sig': signatureHex,
     };
 
     return jsonEncode(payload);
+  }
+
+  /// Memverifikasi keabsahan kriptografis dan masa berlaku payload QR Dinamis wisatawan (Phase 7.1).
+  static bool verifyDynamicQrToken({
+    required Map<String, dynamic> payload,
+    int? currentEpochSeconds,
+  }) {
+    final v = payload['v'];
+    final sessionId = payload['sessionId']?.toString();
+    final nonce = payload['nonce']?.toString();
+    final exp = payload['exp'];
+    final wallet = payload['wallet']?.toString();
+    final btid = payload['btid']?.toString();
+    final sig = payload['sig']?.toString();
+
+    if (v != 1 || sessionId == null || nonce == null || exp == null || wallet == null || btid == null) {
+      return false;
+    }
+
+    final expInt = exp is int ? exp : int.tryParse(exp.toString());
+    if (expInt == null) return false;
+
+    final nowSec = currentEpochSeconds ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000);
+    if (expInt <= nowSec) {
+      return false; // Kedaluwarsa
+    }
+
+    if (sig == null || !sig.startsWith('0x') || sig.length < 130) {
+      return false; // Signature tidak ada atau tidak valid
+    }
+
+    try {
+      final canonicalPayload =
+          'v=1&sessionId=$sessionId&nonce=$nonce&exp=$expInt&wallet=${wallet.toLowerCase()}&btid=$btid';
+      final cleanSig = sig.startsWith('0x') ? sig.substring(2) : sig;
+      final sigBytes = hexToBytes(cleanSig);
+
+      var vByte = sigBytes[64];
+      if (vByte < 27) vByte += 27;
+
+      final messageHash = keccak256(
+        Uint8List.fromList(
+          utf8.encode('\x19Ethereum Signed Message:\n${canonicalPayload.length}$canonicalPayload'),
+        ),
+      );
+
+      final recoveredPublicKey = ecRecover(
+        messageHash,
+        MsgSignature(
+          bytesToInt(sigBytes.sublist(0, 32)),
+          bytesToInt(sigBytes.sublist(32, 64)),
+          vByte,
+        ),
+      );
+
+      final recoveredAddress = bytesToHex(
+        keccak256(recoveredPublicKey).sublist(12),
+        include0x: true,
+      );
+
+      return recoveredAddress.toLowerCase() == wallet.toLowerCase();
+    } on Object catch (_) {
+      return false;
+    }
   }
 
   /// Digitally signs canonical consent attributes and submits to ezsign-core Fastify middleware.
@@ -176,6 +265,7 @@ class VerificationTransactionService {
           }
         } on Object catch (e) {
           developer.log('Respon body non-JSON: $e', name: _serviceName);
+          throw ServerRejected('Respons body bukan format JSON valid dari server: $e', response.statusCode, 'NON_JSON_RESPONSE');
         }
       } else {
         throw NetworkExceptionAdapter.fromHttpResponse(
@@ -335,6 +425,7 @@ class VerificationTransactionService {
           }
         } on Object catch (e) {
           developer.log('Respon body non-JSON: $e', name: _serviceName);
+          throw ServerRejected('Respons body bukan format JSON valid dari server: $e', response.statusCode, 'NON_JSON_RESPONSE');
         }
       } else {
         throw NetworkExceptionAdapter.fromHttpResponse(
@@ -448,6 +539,7 @@ class VerificationTransactionService {
           }
         } on Object catch (e) {
           developer.log('Respon body non-JSON: $e', name: _serviceName);
+          throw ServerRejected('Respons body bukan format JSON valid dari server: $e', response.statusCode, 'NON_JSON_RESPONSE');
         }
       } else {
         throw NetworkExceptionAdapter.fromHttpResponse(
@@ -564,6 +656,7 @@ class VerificationTransactionService {
           }
         } on Object catch (e) {
           developer.log('Respon body non-JSON: $e', name: _serviceName);
+          throw ServerRejected('Respons body bukan format JSON valid dari server: $e', response.statusCode, 'NON_JSON_RESPONSE');
         }
       } else {
         throw NetworkExceptionAdapter.fromHttpResponse(
@@ -676,6 +769,7 @@ class VerificationTransactionService {
           }
         } on Object catch (e) {
           developer.log('Respon body non-JSON: $e', name: _serviceName);
+          throw ServerRejected('Respons body bukan format JSON valid dari server: $e', response.statusCode, 'NON_JSON_RESPONSE');
         }
       } else {
         throw NetworkExceptionAdapter.fromHttpResponse(

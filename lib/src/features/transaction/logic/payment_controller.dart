@@ -229,6 +229,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
         rethrow;
       } on Object catch (e) {
         developer.log('Pengecekan saldo awal lewati ke broadcast: $e', name: 'PaymentController');
+        state = state.copyWith(errorMessage: null);
       }
 
       await stateMachine.transitionTo(TxState.signing);
@@ -275,6 +276,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       );
     } on Object catch (e) {
       developer.log('Pencatatan audit levy server tertunda: $e', name: 'PaymentController');
+      state = state.copyWith(errorMessage: null);
     }
 
     await ref
@@ -286,6 +288,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       await ref.read(verificationControllerProvider.notifier).loadAuditHistory();
     } on Object catch (e) {
       developer.log('Penyegaran state pasca-transaksi: $e', name: 'PaymentController');
+      state = state.copyWith(errorMessage: null);
     }
 
     final receipt = LevyReceiptData(
@@ -395,6 +398,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
         rethrow;
       } on Object catch (e) {
         developer.log('Pengecekan saldo QRIS lewati ke broadcast: $e', name: 'PaymentController');
+        state = state.copyWith(errorMessage: null);
       }
 
       await stateMachine.transitionTo(TxState.signing);
@@ -443,6 +447,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       );
     } on Object catch (e) {
       developer.log('Pencatatan audit QRIS server tertunda: $e', name: 'PaymentController');
+      state = state.copyWith(errorMessage: null);
     }
 
     try {
@@ -450,6 +455,7 @@ class PaymentNotifier extends StateNotifier<PaymentState> {
       await ref.read(verificationControllerProvider.notifier).loadAuditHistory();
     } on Object catch (e) {
       developer.log('Penyegaran state pasca-transaksi: $e', name: 'PaymentController');
+      state = state.copyWith(errorMessage: null);
     }
 
     final receipt = QrisReceiptData(

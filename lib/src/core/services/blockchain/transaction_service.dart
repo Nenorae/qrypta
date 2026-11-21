@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:qrypta/src/core/error/app_failure.dart';
 import 'package:web3dart/web3dart.dart';
 import 'package:qrypta/src/core/graphql/queries.dart'; // Import queries.dart for the mutation
 
@@ -252,6 +253,7 @@ class TransactionService {
         }
       } on Object catch (e) {
         developer.log('Polling receipt transaksi menghadapi error: $e', name: _serviceName);
+        if (!completer.isCompleted && e is AppFailure) completer.completeError(e);
       }
     });
 

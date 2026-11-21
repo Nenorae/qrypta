@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
+import 'package:qrypta/src/core/providers/realtime_providers.dart';
+import 'package:qrypta/src/core/services/realtime/realtime_channel_service.dart';
 import 'package:qrypta/src/features/authentication/presentation/providers/btid_provider.dart';
 import 'package:qrypta/src/features/verification/logic/verification_controller.dart';
 import 'package:qrypta/src/features/verification/presentation/screens/consent_request_screen.dart';
@@ -25,21 +27,21 @@ class _DynamicQrScreenState extends ConsumerState<DynamicQrScreen> {
     });
   }
 
-  void _onSimulateScan(String category) {
-    final request = ref
-        .read(verificationControllerProvider.notifier)
-        .triggerMerchantSimulation(category);
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ConsentRequestScreen(request: request),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Dengarkan request consent yang masuk secara real-time dari merchant (Phase 7.2)
+    ref.listen<VerificationState>(verificationControllerProvider, (previous, next) {
+      final req = next.activeConsentRequest;
+      if (req != null && req != previous?.activeConsentRequest && !req.isExpired) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConsentRequestScreen(request: req),
+          ),
+        );
+      }
+    });
+
     final state = ref.watch(verificationControllerProvider);
     final credential = ref.watch(btidCredentialProvider);
     final btidNumber = (credential?.btidNumber.isNotEmpty == true)
@@ -342,106 +344,89 @@ class _DynamicQrScreenState extends ConsumerState<DynamicQrScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Dev/Demo Panel: Simulate Merchant Scan
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFFA78BFA).withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.terminal_rounded, size: 16, color: Color(0xFFA78BFA)),
-                        SizedBox(width: 8),
+              // Real-Time Handshake Status Card (Phase 7.2 / F-15)
+              Consumer(
+                builder: (context, ref, _) {
+                  final connectionAsync = ref.watch(realtimeConnectionStatusProvider);
+                  final connStatus = connectionAsync.value ?? RealtimeConnectionStatus.disconnected;
+                  final isConnected = connStatus == RealtimeConnectionStatus.connected;
+                  final isConnecting = connStatus == RealtimeConnectionStatus.connecting ||
+                      connStatus == RealtimeConnectionStatus.reconnecting;
+
+                  final statusColor = isConnected
+                      ? const Color(0xFF2DD4BF)
+                      : (isConnecting ? Colors.amberAccent : Colors.white54);
+                  final statusText = isConnected
+                      ? 'Live WebSocket Connected'
+                      : (isConnecting ? 'Connecting to Handshake Channel...' : 'Real-time Channel Standby');
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: statusColor,
+                                boxShadow: [
+                                  if (isConnected)
+                                    BoxShadow(
+                                      color: statusColor.withValues(alpha: 0.6),
+                                      blurRadius: 6,
+                                      spreadRadius: 1,
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'REAL-TIME MERCHANT HANDSHAKE',
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         Text(
-                          'DEMO HANDSHAKE SIMULATION',
+                          statusText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Show this dynamic QR to an accredited merchant scanner. When scanned, an authenticated consent request will appear on your screen in real time.',
                           style: TextStyle(
-                            color: Color(0xFFA78BFA),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.0,
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Simulate an authorized merchant scanning this dynamic QR code:',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _buildSimulationChip(
-                          icon: Icons.hotel_rounded,
-                          label: 'Bali Ocean Resort (Hotel)',
-                          onTap: () => _onSimulateScan('hotel'),
-                        ),
-                        _buildSimulationChip(
-                          icon: Icons.directions_car_rounded,
-                          label: 'Island Drive (Car Rental)',
-                          onTap: () => _onSimulateScan('car'),
-                        ),
-                        _buildSimulationChip(
-                          icon: Icons.coffee_rounded,
-                          label: 'Bali Coffee (Age Check 18+)',
-                          onTap: () => _onSimulateScan('cafe'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSimulationChip({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: const Color(0xFFA78BFA).withValues(alpha: 0.4),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: const Color(0xFFA78BFA)),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
         ),
       ),
     );
