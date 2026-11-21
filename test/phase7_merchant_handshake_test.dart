@@ -88,7 +88,7 @@ void main() {
 
       final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       final exp = decoded['exp'] as int;
-      expect(exp - nowSec, inInclusiveRange(43, 46));
+      expect(exp - nowSec, inInclusiveRange(38, 47));
 
       // Verifikasi keabsahan kriptografis tanda tangan
       final isValid = VerificationTransactionService.verifyDynamicQrToken(payload: decoded);

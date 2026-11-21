@@ -53,6 +53,7 @@ dependencies:
   wallet: ^0.0.13
   camera: ^0.12.2
   permission_handler: ^13.0.2
+  nfc_manager: ^4.4.0
 
 dev_dependencies:
   flutter_test:

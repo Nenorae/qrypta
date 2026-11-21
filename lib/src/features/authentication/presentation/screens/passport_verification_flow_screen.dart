@@ -2,18 +2,24 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:nfc_manager/nfc_manager.dart';
 import 'package:qrypta/src/core/config/theme/app_colors.dart';
+import 'package:qrypta/src/core/error/app_failure.dart';
 import 'package:qrypta/src/core/utils/mrz_parser.dart';
+import 'package:qrypta/src/features/authentication/data/nfc/nfc_passport_service.dart';
+import 'package:qrypta/src/features/authentication/domain/models/nfc_passport_models.dart';
 import 'package:qrypta/src/features/authentication/presentation/screens/btid_issued_screen.dart';
 
 enum VerificationStep { nfc, auth, liveness }
 
 class PassportVerificationFlowScreen extends StatefulWidget {
   final MrzParseResult mrzResult;
+  final NfcPassportService? nfcService;
 
   const PassportVerificationFlowScreen({
     super.key,
     required this.mrzResult,
+    this.nfcService,
   });
 
   @override
@@ -31,29 +37,20 @@ class _PassportVerificationFlowScreenState
   late AnimationController _pulseController;
   late AnimationController _livenessController;
 
-  // State Step 1: NFC
-  int _nfcStageIndex = 0;
-  double _nfcProgress = 0.0;
-  Timer? _nfcTimer;
-  static const List<String> _nfcStages = [
-    'Connecting to passport contactless antenna...',
-    'Establishing secure channel (BAC/PACE)...',
-    'Reading passport data (DG1: MRZ)...',
-    'Reading passport photograph (DG2: Biometrics)...',
-    'Reading signed security data (SOD)...',
-    'Chip read successfully!',
-  ];
+  // Layanan NFC Paspor Riil (Phase 8.1)
+  late final NfcPassportService _nfcService;
 
-  // State Step 2: Auth
-  int _authStageIndex = 0;
-  Timer? _authTimer;
-  static const List<String> _authStages = [
-    'Electronic passport detected',
-    'Chip data integrity verified (DG1 & DG2 hashes matched SOD)',
-    'Digital signature verified (SOD ECDSA signature valid)',
-    'Document signer certificate verified',
-    'Issuing country trust verified (ICAO PKD / CSCA)',
-  ];
+  // State Step 1: NFC Nyata (Mengeliminasi fake timer 650ms)
+  NfcAvailability _nfcAvailability = NfcAvailability.enabled;
+  NfcReadStage _nfcStage = NfcReadStage.idle;
+  String _nfcStageMessage = 'Hold passport firmly against phone NFC area';
+  double _nfcProgress = 0.0;
+  String? _nfcErrorMessage;
+  bool _isNfcScanning = false;
+  PassportChipData? _chipData;
+
+  // State Step 2: Auth Nyata (Mengeliminasi fake timer & hardcoded DSC)
+  PassiveAuthResult? _passiveAuthResult;
 
   // State Step 3: Liveness
   int _livenessStageIndex = 0;
@@ -69,6 +66,8 @@ class _PassportVerificationFlowScreenState
   @override
   void initState() {
     super.initState();
+    _nfcService = widget.nfcService ?? NfcPassportService();
+
     _radarController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -84,64 +83,88 @@ class _PassportVerificationFlowScreenState
       duration: const Duration(milliseconds: 2500),
     );
 
-    _startNfcSequence();
+    _checkHardwareAndStartNfc();
   }
 
   @override
   void dispose() {
+    _nfcService.cancelScanningSession();
     _radarController.dispose();
     _pulseController.dispose();
     _livenessController.dispose();
-    _nfcTimer?.cancel();
-    _authTimer?.cancel();
     _livenessTimer?.cancel();
     super.dispose();
   }
 
-  // --- Step 1: NFC Sequence ---
-  void _startNfcSequence() {
-    _nfcTimer?.cancel();
-    _nfcStageIndex = 0;
-    _nfcProgress = 0.0;
+  // --- Step 1: Inisialisasi & Pembacaan NFC Fisik Nyata ---
+  Future<void> _checkHardwareAndStartNfc() async {
+    final availability = await _nfcService.checkHardwareAvailability();
+    if (!mounted) return;
 
-    _nfcTimer = Timer.periodic(const Duration(milliseconds: 650), (timer) {
-      if (!mounted) return;
-      setState(() {
-        if (_nfcStageIndex < _nfcStages.length - 1) {
-          _nfcStageIndex++;
-          _nfcProgress = (_nfcStageIndex + 1) / _nfcStages.length;
-        } else {
-          _nfcProgress = 1.0;
-          timer.cancel();
-          // Auto advance ke Auth step
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (mounted) {
-              setState(() {
-                _currentStep = VerificationStep.auth;
-              });
-              _startAuthSequence();
-            }
-          });
-        }
-      });
+    setState(() {
+      _nfcAvailability = availability;
+      if (availability == NfcAvailability.disabled) {
+        _nfcErrorMessage = 'NFC is disabled. Please turn on NFC in phone settings.';
+      } else if (availability == NfcAvailability.unsupported) {
+        _nfcErrorMessage = 'This device does not have an NFC chip reader.';
+      } else {
+        _nfcErrorMessage = null;
+      }
     });
+
+    if (availability == NfcAvailability.enabled) {
+      _startNfcSession();
+    }
   }
 
-  // --- Step 2: Auth Sequence ---
-  void _startAuthSequence() {
-    _authTimer?.cancel();
-    _authStageIndex = 0;
-
-    _authTimer = Timer.periodic(const Duration(milliseconds: 600), (timer) {
-      if (!mounted) return;
-      setState(() {
-        if (_authStageIndex < _authStages.length - 1) {
-          _authStageIndex++;
-        } else {
-          timer.cancel();
-        }
-      });
+  Future<void> _startNfcSession() async {
+    if (_isNfcScanning) return;
+    setState(() {
+      _isNfcScanning = true;
+      _nfcErrorMessage = null;
+      _nfcStage = NfcReadStage.waitingForPassport;
+      _nfcStageMessage = 'Hold passport firmly against phone back antenna';
+      _nfcProgress = 0.2;
     });
+
+    await _nfcService.startPhysicalScanningSession(
+      cameraMrz: widget.mrzResult,
+      onProgress: (stage, message) {
+        if (!mounted) return;
+        setState(() {
+          _nfcStage = stage;
+          _nfcStageMessage = message;
+          _nfcProgress = stage.progressFraction;
+        });
+      },
+      onSuccess: (chipData) {
+        if (!mounted) return;
+        setState(() {
+          _isNfcScanning = false;
+          _chipData = chipData;
+          _passiveAuthResult = chipData.passiveAuth;
+          _nfcStage = NfcReadStage.completed;
+          _nfcProgress = 1.0;
+        });
+
+        // Maju ke Auth step secara otomatis dengan jeda kecil
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted) {
+            setState(() {
+              _currentStep = VerificationStep.auth;
+            });
+          }
+        });
+      },
+      onError: (failure) {
+        if (!mounted) return;
+        setState(() {
+          _isNfcScanning = false;
+          _nfcStage = NfcReadStage.error;
+          _nfcErrorMessage = failure.message;
+        });
+      },
+    );
   }
 
   // --- Step 3: Liveness Sequence ---
@@ -165,8 +188,10 @@ class _PassportVerificationFlowScreenState
   }
 
   void _showSecurityDetailsModal() {
+    final pa = _passiveAuthResult;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
@@ -175,63 +200,79 @@ class _PassportVerificationFlowScreenState
             color: Color(0xFF131D2D),
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text(
-                    'PKI Security Details',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text(
+                      'PKI Security Details',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  Icon(Icons.security_rounded, color: Color(0xFFA78BFA), size: 20),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0C1322),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    _buildModalRow('Document Type', 'ePassport / ICAO Doc 9303 TD3'),
-                    const Divider(color: Colors.white12, height: 14),
-                    _buildModalRow('Country Trust Authority', '${widget.mrzResult.nationality} HMPO CSCA'),
-                    const Divider(color: Colors.white12, height: 14),
-                    _buildModalRow('Document Signer (DS)', 'UKPA-DS-2024-08'),
-                    const Divider(color: Colors.white12, height: 14),
-                    _buildModalRow('Hash Algorithm', 'SHA-256 (FIPS 180-4)'),
-                    const Divider(color: Colors.white12, height: 14),
-                    _buildModalRow('Signature Scheme', 'ECDSA BrainpoolP256r1'),
-                    const Divider(color: Colors.white12, height: 14),
-                    _buildModalRow('Passive Authentication', 'VALIDATED · GENUINE'),
+                    Icon(Icons.security_rounded, color: Color(0xFFA78BFA), size: 20),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E293B),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0C1322),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text('Close'),
+                  child: Column(
+                    children: [
+                      _buildModalRow('Document Type', 'ePassport / ICAO Doc 9303 TD3'),
+                      const Divider(color: Colors.white12, height: 14),
+                      _buildModalRow(
+                        'Country Trust Authority',
+                        pa?.cscaCountry ?? '${widget.mrzResult.nationality} CSCA (Unverified Anchor)',
+                      ),
+                      const Divider(color: Colors.white12, height: 14),
+                      _buildModalRow('Document Signer (DS)', pa?.dscSubject ?? 'Document Signer'),
+                      const Divider(color: Colors.white12, height: 14),
+                      _buildModalRow('DS Serial Number', pa?.dscSerial ?? 'N/A'),
+                      const Divider(color: Colors.white12, height: 14),
+                      _buildModalRow('Hash Algorithm', '${pa?.hashAlgorithm ?? "SHA-256"} (FIPS 180-4)'),
+                      const Divider(color: Colors.white12, height: 14),
+                      _buildModalRow('Signature Scheme', pa?.signatureAlgorithm ?? 'ECDSA / RSA'),
+                      const Divider(color: Colors.white12, height: 14),
+                      _buildModalRow(
+                        'Passive Authentication',
+                        pa != null
+                            ? (pa.isGenuine
+                                ? 'VALIDATED · GENUINE'
+                                : (pa.status == PassiveAuthStatus.unverifiedNoTrustAnchor
+                                    ? 'UNVERIFIED · NO TRUST ANCHOR'
+                                    : 'FAILED · INTEGRITY COMPROMISED'))
+                            : 'PENDING READ',
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E293B),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Close'),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -246,12 +287,18 @@ class _PassportVerificationFlowScreenState
           label,
           style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -285,11 +332,8 @@ class _PassportVerificationFlowScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Step Progress Tracker
               _buildStepTracker(),
               const SizedBox(height: 24),
-
-              // Konten Utama Dinamis Berdasarkan Step
               Expanded(
                 child: _buildStepContent(),
               ),
@@ -416,13 +460,12 @@ class _PassportVerificationFlowScreenState
     }
   }
 
-  // --- 1. NFC VIEW ---
+  // --- 1. REAL NFC VIEW (Phase 8.1) ---
   Widget _buildNfcView() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Spacer(),
-        // Radar Pulsa Animasi Berpusat pada Ikon NFC
         Center(
           child: Stack(
             alignment: Alignment.center,
@@ -435,7 +478,10 @@ class _PassportVerificationFlowScreenState
                     height: 170 + (_pulseController.value * 25),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFFA78BFA).withValues(alpha: 0.08),
+                      color: (_nfcErrorMessage != null
+                              ? Colors.redAccent
+                              : const Color(0xFFA78BFA))
+                          .withValues(alpha: 0.08),
                     ),
                   );
                 },
@@ -445,9 +491,15 @@ class _PassportVerificationFlowScreenState
                 height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFA78BFA).withValues(alpha: 0.15),
+                  color: (_nfcErrorMessage != null
+                          ? Colors.redAccent
+                          : const Color(0xFFA78BFA))
+                      .withValues(alpha: 0.15),
                   border: Border.all(
-                    color: const Color(0xFFA78BFA).withValues(alpha: 0.4),
+                    color: (_nfcErrorMessage != null
+                            ? Colors.redAccent
+                            : const Color(0xFFA78BFA))
+                        .withValues(alpha: 0.4),
                     width: 1.5,
                   ),
                 ),
@@ -457,19 +509,24 @@ class _PassportVerificationFlowScreenState
                 height: 90,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const RadialGradient(
-                    colors: [Color(0xFF8B5CF6), Color(0xFF4C1D95)],
+                  gradient: RadialGradient(
+                    colors: _nfcErrorMessage != null
+                        ? [const Color(0xFFEF4444), const Color(0xFF991B1B)]
+                        : [const Color(0xFF8B5CF6), const Color(0xFF4C1D95)],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                      color: (_nfcErrorMessage != null
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFF8B5CF6))
+                          .withValues(alpha: 0.4),
                       blurRadius: 20,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.nfc_rounded,
+                child: Icon(
+                  _nfcErrorMessage != null ? Icons.nfc_outlined : Icons.nfc_rounded,
                   size: 48,
                   color: Colors.white,
                 ),
@@ -479,12 +536,12 @@ class _PassportVerificationFlowScreenState
         ),
         const SizedBox(height: 36),
 
-        // Tahapan Teks Berurutan
+        // Tahapan Teks Berurutan Real-Time
         Text(
-          _nfcStages[_nfcStageIndex],
+          _nfcErrorMessage ?? _nfcStageMessage,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: _nfcErrorMessage != null ? Colors.redAccent : Colors.white,
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -495,27 +552,66 @@ class _PassportVerificationFlowScreenState
         ClipRRect(
           borderRadius: BorderRadius.circular(10),
           child: LinearProgressIndicator(
-            value: _nfcProgress,
+            value: _nfcErrorMessage != null ? 0.0 : _nfcProgress,
             backgroundColor: Colors.white12,
-            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFA78BFA)),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _nfcErrorMessage != null ? Colors.redAccent : const Color(0xFFA78BFA),
+            ),
             minHeight: 8,
           ),
         ),
         const SizedBox(height: 12),
         Text(
-          'Hold passport firmly against phone NFC area',
+          _nfcErrorMessage != null
+              ? 'Please resolve the error and try scanning again'
+              : 'Hold passport firmly against phone NFC area (back antenna)',
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.5),
             fontSize: 12,
           ),
         ),
+
         const Spacer(),
+
+        // Tombol Retry bila terjadi kegagalan atau hardware belum scan
+        if (_nfcErrorMessage != null || !_isNfcScanning)
+          SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _checkHardwareAndStartNfc,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E293B),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFA78BFA)),
+                ),
+              ),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: Text(
+                _nfcErrorMessage != null ? 'Try Scanning Again' : 'Start NFC Scan',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        const SizedBox(height: 10),
       ],
     );
   }
 
-  // --- 2. AUTH VIEW ---
+  // --- 2. AUTH VIEW NYATA (Phase 8.2) ---
   Widget _buildAuthView() {
+    final pa = _passiveAuthResult;
+    final bool dgMatched = pa?.dgHashesMatched[1] == true;
+    final bool sigValid = pa != null &&
+        pa.status != PassiveAuthStatus.signatureInvalid &&
+        pa.status != PassiveAuthStatus.parseError;
+    final bool isGenuine = pa?.isGenuine == true;
+    final bool isUnverifiedAnchor =
+        pa?.status == PassiveAuthStatus.unverifiedNoTrustAnchor;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -538,36 +634,52 @@ class _PassportVerificationFlowScreenState
             fontSize: 12,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
 
-        // 4-Node Visual Trust Chain
-        _buildTrustChainNode(
-          title: 'ePassport chip',
-          subtitle: 'ISO 14443 contactless microchip intact',
-          isDone: _authStageIndex >= 0,
-        ),
-        _buildTrustChainConnector(_authStageIndex >= 1),
-        _buildTrustChainNode(
-          title: 'Signed passport data',
-          subtitle: 'DG1 & DG2 hashes match SOD document',
-          isDone: _authStageIndex >= 1,
-        ),
-        _buildTrustChainConnector(_authStageIndex >= 2),
-        _buildTrustChainNode(
-          title: 'Document signer certificate',
-          subtitle: 'ECDSA signature validated with public key',
-          isDone: _authStageIndex >= 2,
-        ),
-        _buildTrustChainConnector(_authStageIndex >= 4),
-        _buildTrustChainNode(
-          title: 'Country trust authority',
-          subtitle: '${widget.mrzResult.nationality} Master List CSCA verified',
-          isDone: _authStageIndex >= 4,
+        // 4-Node Visual Trust Chain Dinamis
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildTrustChainNode(
+                  title: 'ePassport chip',
+                  subtitle: 'ISO 14443 contactless microchip intact',
+                  isDone: _chipData != null,
+                ),
+                _buildTrustChainConnector(dgMatched),
+                _buildTrustChainNode(
+                  title: 'Signed passport data',
+                  subtitle: dgMatched
+                      ? 'DG1 hash matched SOD (${pa?.hashAlgorithm ?? "SHA-256"})'
+                      : 'DG1 hash verification failed',
+                  isDone: dgMatched,
+                ),
+                _buildTrustChainConnector(sigValid),
+                _buildTrustChainNode(
+                  title: 'Document signer certificate',
+                  subtitle: sigValid
+                      ? 'DSC signature validated (${pa?.signatureAlgorithm ?? "RSA/ECDSA"})'
+                      : 'DSC signature validation failed',
+                  isDone: sigValid,
+                ),
+                _buildTrustChainConnector(isGenuine || isUnverifiedAnchor),
+                _buildTrustChainNode(
+                  title: 'Country trust authority',
+                  subtitle: isGenuine
+                      ? '${pa?.cscaCountry ?? widget.mrzResult.nationality} Master List CSCA verified'
+                      : (isUnverifiedAnchor
+                          ? 'Root CSCA for ${widget.mrzResult.nationality} unverified in local trust store'
+                          : 'Trust anchor verification failed'),
+                  isDone: isGenuine || isUnverifiedAnchor,
+                  isWarning: isUnverifiedAnchor,
+                ),
+              ],
+            ),
+          ),
         ),
 
-        const Spacer(),
+        const SizedBox(height: 12),
 
-        // Tombol Security Details
         OutlinedButton.icon(
           onPressed: _showSecurityDetailsModal,
           style: OutlinedButton.styleFrom(
@@ -582,7 +694,6 @@ class _PassportVerificationFlowScreenState
         ),
         const SizedBox(height: 12),
 
-        // Tombol Lanjut ke Face Check
         SizedBox(
           height: 52,
           child: ElevatedButton(
@@ -624,25 +735,36 @@ class _PassportVerificationFlowScreenState
     required String title,
     required String subtitle,
     required bool isDone,
+    bool isWarning = false,
   }) {
+    Color borderColor;
+    Color iconColor;
+    IconData iconData;
+
+    if (isWarning) {
+      borderColor = const Color(0xFFF59E0B).withValues(alpha: 0.6);
+      iconColor = const Color(0xFFF59E0B);
+      iconData = Icons.warning_amber_rounded;
+    } else if (isDone) {
+      borderColor = const Color(0xFF2DD4BF).withValues(alpha: 0.5);
+      iconColor = const Color(0xFF2DD4BF);
+      iconData = Icons.check_circle_rounded;
+    } else {
+      borderColor = Colors.white12;
+      iconColor = Colors.white24;
+      iconData = Icons.radio_button_unchecked;
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF131D2D),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDone
-              ? const Color(0xFF2DD4BF).withValues(alpha: 0.5)
-              : Colors.white12,
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
-          Icon(
-            isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-            color: isDone ? const Color(0xFF2DD4BF) : Colors.white24,
-            size: 20,
-          ),
+          Icon(iconData, color: iconColor, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -712,7 +834,6 @@ class _PassportVerificationFlowScreenState
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Outer Glowing Ring
               RotationTransition(
                 turns: _radarController,
                 child: Container(
@@ -729,7 +850,6 @@ class _PassportVerificationFlowScreenState
                   ),
                 ),
               ),
-              // Inner Camera Frame
               Container(
                 width: 170,
                 height: 170,
@@ -756,7 +876,6 @@ class _PassportVerificationFlowScreenState
         ),
         const SizedBox(height: 24),
 
-        // Status Text
         Text(
           _livenessStages[_livenessStageIndex],
           textAlign: TextAlign.center,
@@ -768,7 +887,6 @@ class _PassportVerificationFlowScreenState
         ),
         const SizedBox(height: 16),
 
-        // Kartu Skor Kemiripan
         if (_livenessComplete)
           Container(
             padding: const EdgeInsets.all(14),
@@ -825,7 +943,6 @@ class _PassportVerificationFlowScreenState
 
         const Spacer(),
 
-        // Catatan Privasi
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -846,7 +963,6 @@ class _PassportVerificationFlowScreenState
         ),
         const SizedBox(height: 12),
 
-        // Tombol Terbitkan BTID
         SizedBox(
           height: 52,
           child: ElevatedButton(
@@ -856,7 +972,7 @@ class _PassportVerificationFlowScreenState
                       context,
                       MaterialPageRoute(
                         builder: (context) => BtidIssuedScreen(
-                          mrzResult: widget.mrzResult,
+                          mrzResult: _chipData?.chipMrz ?? widget.mrzResult,
                         ),
                       ),
                     );

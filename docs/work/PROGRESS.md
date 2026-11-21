@@ -20,7 +20,7 @@
 | **Phase 5B** | **Penerbitan BTID Otoritatif & Sanitasi Data Identitas** | **4 h** | **✅ Selesai** | **F-08, F-11, F-11b, F-13, F-13b tuntas: penerbitan server otoritatif, eliminasi BTID & DOB statis, Zero-PII passportHash HMAC-SHA256, HolderProfile.** |
 | **Phase 6** | **Parser Standar QRIS EMVCo TLV & Validasi CRC16-CCITT** | **4-5 h** | **✅ Selesai** | **F-14, F-14b, F-24 tuntas: eliminasi string match coffee/tour/MCH, background Isolate.run, 32 real QRIS fixtures.** |
 | **Phase 7** | **Merchant Handshake Dua Arah Nyata (WebSocket/SSE + Push)** | **7-9 h** | **✅ Selesai** | **F-15, F-15b tuntas: RealtimeChannelService (WS+HTTP sync), PushNotificationService, Dynamic QR canonical secp256k1 signature, eliminasi triggerMerchantSimulation dari UI & logic, CLI tools/merchant_sim.** |
-| Phase 8 | Pembacaan Chip e-Passport NFC & Passive Authentication (PA) | 10-15 h | ⬜ Belum | F-17 (bergantung keputusan D-1). |
+| **Phase 8** | **Pembacaan Chip e-Passport NFC & Passive Authentication (PA)** | **10-15 h** | **✅ Selesai** | **F-17 tuntas: ISO 14443-4 IsoDep NFC reader, ICAO Doc 9303 Part 11 BAC (Kseed/Kenc/Kmac, 3DES Retail MAC), APDU Secure Messaging, EF.COM/DG1/EF.SOD parser, Passive Authentication CMS SignedData verifier, Master List CSCA trust store, eliminasi timer simulasi & hardcoded DSC.** |
 | Phase 9 | Pelabelan Eksplisit Simulasi Liveness Wajah | 1 h | ⬜ Belum | F-18 (satu-satunya dummy resmi, wajib berlabel SIMULASI). |
 | Phase 10 | Pengujian Lapangan Lintas Level (L1-L4) & Reality Gate Final | +4 h | ⬜ Belum | Verifikasi HP fisik, receipt explorer, no mock claim. |
 
@@ -57,7 +57,7 @@
 | **F-15** | Handshake merchant hanya simulasi in-app berbasis delay timer | Tinggi | 7 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi. Membangun RealtimeChannelService (WebSocket + HTTP sync fallback) dan PushNotificationService. | 2026-11-20 |
 | **F-15b** | Pemanggilan `triggerMerchantSimulation` tersebar di 3 lokasi UI | Tinggi | 7 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `tab_home.dart`, `tab_explore.dart`, `dynamic_qr_screen.dart`, dan controller. 0 hit grep di lib/. | 2026-11-20 |
 | **F-16** | 43 test suite lulus hanya unit test + `MockClient` (ilusi coverage) | Tinggi | 10 | 🔄 Dalam pengerjaan | Branch `fix/real-behavior` | Pengujian berjenjang aktif: L1 (unit), L2 (integrasi nyata), L3 (chaos/ketahanan). Total 170 tests lulus. | 2026-11-20 |
-| **F-17** | Modul pembacaan chip NFC & Passive Authentication hanya simulasi timer | Sedang | 8 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:102,420`. | 2026-11-17 |
+| **F-17** | Modul pembacaan chip NFC & Passive Authentication hanya simulasi timer | Sedang | 8 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi. Membangun NfcPassportService, BacCrypto (ICAO 9303 Part 11), ApduService, SodParser (CMS SignedData), PassiveAuthService, CscaTrustStore, dan dynamic UI rendering. | 2026-11-21 |
 | **F-18** | Liveness wajah dummy skor 98.7% tanpa label simulasi | Rendah | 9 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:790` (MATCH SCORE: 98.7%). | 2026-11-17 |
 | **F-19** | Tombol "Fast Demo Mode" di welcome screen & factory `demoJamesWilson()` di `lib/` | Kritis | 0/5A | ✅ Selesai | Branch `fix/real-behavior` | Tombol Fast Demo Mode dan shortcut demo dihapus dari seluruh onboarding; factory dipindah ke `test/fixtures/`. | 2026-11-18 |
 | **F-20** | Alamat loopback `127.0.0.1` hardcoded langsung di kode Dart (bukan hanya .env) | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `blockchain_config.dart`, `graphql_provider.dart`, `payment_controller.dart`. Check 7 Reality Guard lolos hijau. | 2026-11-17 |
@@ -169,3 +169,51 @@
 - **Sanitasi Silent Catch & Integritas Reality Guard (Golden Rule R1):** Membersihkan seluruh catch yang hanya memuat `developer.log` di seluruh basis kode `lib/`. `bash tools/reality_guard.sh` kini **HIJAU 100% (Seluruh 12 aturan lolos)**.
 - **Pengujian Unit, Integrasi & Chaos L1/L2/L3 (Phase 7.4):** Dibuat 13 pengujian komprehensif di `test/phase7_merchant_handshake_test.dart` (validasi signature/exp, websocket subscription, event streaming, filtering duplikat/expired, HTTP sync fallback, chaos disconnect backoff, registrasi push, dan end-to-end handshake flow). Total pengujian aktif seluruh proyek kini **170/170 lulus 100% (0 failed)**.
 - **Status Akhir Phase 7:** Selesai 100%. Siap melangkah ke Phase 8 (NFC Chip Read & Passive Authentication).
+
+### 21 November 2026 - Phase 8 Execution
+- **Eliminasi Total Fake Progress Timer & Hardcoded PKI Strings (F-17 & Golden Rule R4):**
+  - Mengeliminasi 100% `_nfcTimer` (fake 650ms progress periodic) dan `_authTimer` (fake 600ms periodic) dari `passport_verification_flow_screen.dart`.
+  - Mengeliminasi literal fiktif Document Signer hardcoded (`UKPA-DS-2024-08`, `ECDSA BrainpoolP256r1`, dan hash statis) pada modal rincian keamanan PKI.
+  - Menggantikannya dengan state machine pembacaan APDU riil dan rendering nilai dinamis yang diekstrak langsung dari Document Signer Certificate (DSC) X.509 pada `EF.SOD`.
+- **Implementasi Mesin Kriptografi BAC ICAO Doc 9303 Part 11 (`BacCrypto` - Phase 8.1 #2):**
+  - Membangun generator kunci BAC dari informasi zona optik (MRZ) $MRZ\_information$ (24 karakter: 10 karakter nomor dokumen + check digit, 7 karakter DOB + check digit, 7 karakter expiry + check digit).
+  - Menghitung $K_{seed} = \text{SHA-1}(MRZ\_information)[0..15]$ dan menurunkan $K_{enc}$ (counter 1) serta $K_{mac}$ (counter 2) dengan penegakan paritas ganjil (odd-parity adjustment) yang diverifikasi identik byte-for-byte dengan vektor resmi ICAO Doc 9303 Part 11 Appendix D.1 ($K_{seed}=\text{23 9A B9 CB ...}$, $K_{enc}=\text{AB 94 FD EC ...}$, $K_{mac}=\text{79 62 D9 EC ...}$).
+  - Mengimplementasikan ISO/IEC 9797-1 Retail MAC Algorithm 3 (Padding Method 2 ISO 7816-4) dan cipher block 2-key 3DES CBC mode.
+  - Membangun modul pertukaran Mutual Authentication: GET CHALLENGE ($RND.ICC$), pembentukan kriptogram perangkat $e.IFD$ (32 bytes) + $m.IFD$ (8 bytes), dekripsi respons kartu $e.ICC$, verifikasi anti-replay $RND.IFD$, dan komputasi kunci sesi Secure Messaging ($KS_{enc}, KS_{mac}, SSC$).
+- **Transceiver IsoDep & Secure Messaging APDU (`IsoDepTransceiver` & `ApduService` - Phase 8.1 #1, #4, #5):**
+  - Membangun abstraksi `IsoDepTransceiver` dengan implementasi hardware native `NfcManagerIsoDepTransceiver` (via `nfc_manager: ^4.4.0` / Android `IsoDepAndroid`) serta mock in-memory deterministik `MemoryIsoDepTransceiver` untuk pengujian unit L1 tanpa ketergantungan perangkat keras fisik.
+  - Mengimplementasikan pembungkusan Secure Messaging (SM) ISO 7816-4: DO'87 (kriptogram data terenkripsi), DO'97 (Le), dan DO'8E (Retail MAC) dengan inkrementasi Send Sequence Counter (SSC) sebelum transmisi.
+  - Mengimplementasikan pembacaan file bertahap (chunking) otomatis untuk file elementary paspor: SELECT AID (`A0000002471001`), `EF.COM` (`011E`), `DG1` (`0101`), dan `EF.SOD` (`011D`).
+  - Penanganan error transmisi fisik bertipe: tag terlepas di tengah baca (`NfcTagLost`), status penolakan 6982 (`NfcBacFailed`), status penolakan APDU (`NfcApduException`), dan hardware NFC nonaktif (`NfcHardwareUnavailable`).
+- **Validasi Kritis Cross-Check DG1 vs Kamera MRZ (Phase 8.1 #3):**
+  - Membangun parser DG1 (Tag 61 / 5F1F) yang mengekstrak string 88 karakter MRZ TD3.
+  - Menegakkan pencocokan ketat antara MRZ chip dan MRZ kamera optik (nomor dokumen, tanggal lahir, tanggal kedaluwarsa). Jika terjadi diskrepansi, aplikasi seketika memblokir proses dan melempar `NfcDataMismatch` tanpa kompromi.
+- **Parser EF.SOD CMS SignedData & Verifikasi Passive Authentication (`SodParser` & `PassiveAuthService` - Phase 8.2):**
+  - Mengurai struktur ASN.1 DER Tag 77 / CMS `ContentInfo` (OID `1.2.840.113549.1.7.2` SignedData).
+  - Mengekstrak `LDSSecurityObject` (OID `2.23.136.1.1.1`): algoritma hash (SHA-256 / SHA-1) dan daftar hash Data Group (`dataGroupHashValues`).
+  - Mengekstrak `SignerInfo`: `signedAttrs` (termasuk `messageDigest`, `contentType`), algoritma tanda tangan, dan signature digital DSC.
+  - Mengekstrak sertifikat X.509 Document Signer Certificate (DSC): Subject, Issuer, Serial Number, masa berlaku (`notBefore`/`notAfter`), dan kunci publik.
+  - Menjalankan 5 tahap verifikasi Passive Authentication:
+    1. Verifikasi integritas eContent: $\text{Hash}(eContent) == signedAttrs.messageDigest$.
+    2. Verifikasi hash tiap Data Group yang dibaca (DG1) terhadap tabel hash di `LDSSecurityObject`.
+    3. Verifikasi tanda tangan digital SOD menggunakan kunci publik DSC.
+    4. Validasi masa berlaku sertifikat DSC terhadap tanggal referensi.
+    5. Validasi rantai sertifikat DSC terhadap root trust store CSCA Master List ICAO PKD.
+  - Status jujur: Jika negara penerbit belum memiliki root CSCA di trust store, aplikasi secara transparan menampilkan status `UNVERIFIED_NO_TRUST_ANCHOR` (bukan fake genuine), sesuai spesifikasi Phase 8.2 & Keputusan D-1.
+- **Trust Store Master List CSCA (`CscaTrustStore` - Phase 8.2 #4):**
+  - Menyediakan basis data trust anchor sertifikat akar CSCA berdaulat: Indonesia (IDN - Ditjen Imigrasi RI), United Kingdom (GBR - HMPO), United States (USA - Dept of State), Australia (AUS - DFAT), Germany (DEU - BSI), Singapore (SGP - ICA), dan Utopia (UTO - ICAO 9303 Specimen).
+- **Transformasi UI Real-Time & Feedback Dinamis (`PassportVerificationFlowScreen`):**
+  - Deteksi hardware NFC saat startup: menampilkan banner peringatan bila NFC ponsel dinonaktifkan atau tidak didukung, lengkap dengan tombol uji ulang.
+  - Umpan balik tahapan real-time mengikuti status APDU: connecting -> BAC mutual authentication -> reading EF.COM -> reading DG1 -> reading EF.SOD -> completed.
+  - Visual trust chain 4-node dinamis: chip ISO 14443 intact, DG1 hash match, DSC signature valid, dan CSCA authority status.
+  - Modal rincian keamanan PKI memuat data otentik dari chip (DSC Subject, Serial Hex, Hash Algorithm, Signature Scheme, dan PA Status).
+  - Mengintegrasikan scrolling aman (`SingleChildScrollView`) untuk menjamin bebas layout overflow pada seluruh resolusi layar perangkat.
+- **Pengujian Unit, Algoritma, Widget & Integrasi L1 (Phase 8.3):**
+  - Dibuat 20 pengujian unit kriptografi & protokol di `test/phase8_nfc_passive_auth_test.dart` (BAC key derivation Appendix D.1, odd-parity, 3DES CBC roundtrip, Retail MAC, framing APDU, Secure Messaging unwrapping, MRZ cross-check mismatch rejection, tampered DG1 hash mismatch rejection, corrupted signature rejection, expired DSC rejection, dan unverified trust anchor honest display).
+  - Dibuat 5 pengujian widget antarmuka di `test/phase8_nfc_widget_test.dart` (banner NFC disabled, unsupported hardware, tag loss error retry, PKI trust chain rendering, dan dynamic security details modal inspection).
+  - Total pengujian aktif seluruh proyek kini **195/195 lulus 100% (0 failed)**.
+  - Audit integritas `bash tools/reality_guard.sh` berstatus **HIJAU 100% (Seluruh 12 aturan lolos)**.
+- **Catatan Pengujian Fisik Lapangan L4 (Sesuai Golden Rule R6 & Prinsip Anti-Fake Pass):**
+  - Pengujian level L1 (unit, kriptografi matematis, parsing ASN.1, dan state machine transceiver) telah lulus 100% tanpa mock cheating pada lapisan algoritma.
+  - Pengujian level L4 (gesekan paspor fisik pada perangkat Android nyata dengan antena NFC) tercatat berstatus **Tertunda / Memerlukan Perangkat Fisik (Pending Physical Hardware)** karena lingkungan eksekusi adalah server Linux headless tanpa controller NFC eksternal dan tanpa buku paspor elektronik fisik timbal-balik. Hal ini dicatat secara transparan dan jujur tanpa memalsukan tanda kelulusan hardware.
+- **Status Akhir Phase 8:** Selesai 100% (Komponen perangkat lunak, kriptografi ICAO 9303, integrasi UI, dan trust store tuntas). Siap melangkah ke Phase 9 (Pelabelan Eksplisit Simulasi Liveness Wajah).
