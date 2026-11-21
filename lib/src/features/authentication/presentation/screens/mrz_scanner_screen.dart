@@ -21,16 +21,6 @@ export 'package:qrypta/src/features/authentication/presentation/widgets/manual_p
 export 'package:qrypta/src/features/authentication/presentation/widgets/mrz_detected_result_sheet.dart';
 export 'package:qrypta/src/features/authentication/presentation/widgets/mrz_scanner_overlay.dart';
 
-enum ScannerState {
-  initializing,
-  permissionDenied,
-  cameraUnavailable,
-  searching,
-  partialDetected,
-  verifyingConsensus,
-  completed,
-}
-
 class MrzScannerScreen extends StatefulWidget {
   const MrzScannerScreen({super.key});
 
