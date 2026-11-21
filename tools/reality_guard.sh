@@ -108,6 +108,14 @@ else
   echo "✅ [PASS] Tidak ada literal 'JAMES WILSON' di lib/"
 fi
 
+# 13. [F-18/R4] Larangan klaim biometrik asli: tidak boleh ada klaim biometrik verified/genuine tanpa simulasi di lib/
+if grep -rEni "genuine biometric|biometric verified" lib/ 2>/dev/null; then
+  echo "❌ [FAIL] [F-18] Klaim biometrik terverifikasi/asli ditemukan di lib/ (liveness wajib berlabel SIMULASI)"
+  FAILURES=$((FAILURES + 1))
+else
+  echo "✅ [PASS] [F-18] Bebas dari klaim biometrik palsu di lib/"
+fi
+
 echo "=================================================================="
 if [ $FAILURES -gt 0 ]; then
   echo "🚨 [REALITY GUARD MERAH] Ditemukan $FAILURES pelanggaran fatal integritas kode!"

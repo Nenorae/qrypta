@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/widgets.dart';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -52,7 +53,7 @@ class MockRealtimeSocket implements IRealtimeSocket {
 }
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
   // Test private key & wallet address deterministik
   const testPrivateKeyHex = '4c0883a69102937d6231471b3dbb6832dbca04a98113a19e6fd4f263402d6aec';
@@ -91,7 +92,10 @@ void main() {
       expect(exp - nowSec, inInclusiveRange(38, 47));
 
       // Verifikasi keabsahan kriptografis tanda tangan
-      final isValid = VerificationTransactionService.verifyDynamicQrToken(payload: decoded);
+      final isValid = VerificationTransactionService.verifyDynamicQrToken(
+        payload: decoded,
+        currentEpochSeconds: nowSec,
+      );
       expect(isValid, isTrue);
     });
 
@@ -387,9 +391,6 @@ void main() {
 
     setUp(() {
       mockSocket = MockRealtimeSocket();
-      realtimeService = RealtimeChannelService(
-        socketConnector: (uri, {headers}) async => mockSocket,
-      );
 
       final mockHttpClient = MockClient((request) async {
         if (request.url.path.endsWith('/verify-identity')) {
@@ -407,8 +408,16 @@ void main() {
             headers: {'content-type': 'application/json'},
           );
         }
+        if (request.url.path.contains('/verification/requests')) {
+          return http.Response('[]', 200, headers: {'content-type': 'application/json'});
+        }
         return http.Response('{"error":"not found"}', 404);
       });
+
+      realtimeService = RealtimeChannelService(
+        httpClient: mockHttpClient,
+        socketConnector: (uri, {headers}) async => mockSocket,
+      );
 
       verificationService = VerificationTransactionService(
         null,

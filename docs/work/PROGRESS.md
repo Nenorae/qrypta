@@ -21,7 +21,7 @@
 | **Phase 6** | **Parser Standar QRIS EMVCo TLV & Validasi CRC16-CCITT** | **4-5 h** | **✅ Selesai** | **F-14, F-14b, F-24 tuntas: eliminasi string match coffee/tour/MCH, background Isolate.run, 32 real QRIS fixtures.** |
 | **Phase 7** | **Merchant Handshake Dua Arah Nyata (WebSocket/SSE + Push)** | **7-9 h** | **✅ Selesai** | **F-15, F-15b tuntas: RealtimeChannelService (WS+HTTP sync), PushNotificationService, Dynamic QR canonical secp256k1 signature, eliminasi triggerMerchantSimulation dari UI & logic, CLI tools/merchant_sim.** |
 | **Phase 8** | **Pembacaan Chip e-Passport NFC & Passive Authentication (PA)** | **10-15 h** | **✅ Selesai** | **F-17 tuntas: ISO 14443-4 IsoDep NFC reader, ICAO Doc 9303 Part 11 BAC (Kseed/Kenc/Kmac, 3DES Retail MAC), APDU Secure Messaging, EF.COM/DG1/EF.SOD parser, Passive Authentication CMS SignedData verifier, Master List CSCA trust store, eliminasi timer simulasi & hardcoded DSC.** |
-| Phase 9 | Pelabelan Eksplisit Simulasi Liveness Wajah | 1 h | ⬜ Belum | F-18 (satu-satunya dummy resmi, wajib berlabel SIMULASI). |
+| **Phase 9** | **Pelabelan Eksplisit Simulasi Liveness Wajah** | **1 h** | **✅ Selesai** | **F-18 tuntas: lencana tetap SIMULASI/DEMO (Golden Rule R4), eliminasi skor palsu Genuine match, pencatatan liveness: {mode: SIMULATED, verified: false} di model & audit, guard CI Rule 13.** |
 | Phase 10 | Pengujian Lapangan Lintas Level (L1-L4) & Reality Gate Final | +4 h | ⬜ Belum | Verifikasi HP fisik, receipt explorer, no mock claim. |
 
 ---
@@ -58,7 +58,7 @@
 | **F-15b** | Pemanggilan `triggerMerchantSimulation` tersebar di 3 lokasi UI | Tinggi | 7 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `tab_home.dart`, `tab_explore.dart`, `dynamic_qr_screen.dart`, dan controller. 0 hit grep di lib/. | 2026-11-20 |
 | **F-16** | 43 test suite lulus hanya unit test + `MockClient` (ilusi coverage) | Tinggi | 10 | 🔄 Dalam pengerjaan | Branch `fix/real-behavior` | Pengujian berjenjang aktif: L1 (unit), L2 (integrasi nyata), L3 (chaos/ketahanan). Total 170 tests lulus. | 2026-11-20 |
 | **F-17** | Modul pembacaan chip NFC & Passive Authentication hanya simulasi timer | Sedang | 8 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi. Membangun NfcPassportService, BacCrypto (ICAO 9303 Part 11), ApduService, SodParser (CMS SignedData), PassiveAuthService, CscaTrustStore, dan dynamic UI rendering. | 2026-11-21 |
-| **F-18** | Liveness wajah dummy skor 98.7% tanpa label simulasi | Rendah | 9 | ⬜ Belum | - | Terverifikasi di `passport_verification_flow_screen.dart:790` (MATCH SCORE: 98.7%). | 2026-11-17 |
+| **F-18** | Liveness wajah dummy skor 98.7% tanpa label simulasi | Rendah | 9 | ✅ Selesai | Branch `fix/real-behavior` | Lencana tetap SIMULASI / DEMO di UI, skor berpenjelasan, liveness: {mode: SIMULATED, verified: false} pada BtidCredentialModel & AuditTransactionModel, Check 13 Reality Guard hijau. | 2026-11-21 |
 | **F-19** | Tombol "Fast Demo Mode" di welcome screen & factory `demoJamesWilson()` di `lib/` | Kritis | 0/5A | ✅ Selesai | Branch `fix/real-behavior` | Tombol Fast Demo Mode dan shortcut demo dihapus dari seluruh onboarding; factory dipindah ke `test/fixtures/`. | 2026-11-18 |
 | **F-20** | Alamat loopback `127.0.0.1` hardcoded langsung di kode Dart (bukan hanya .env) | Kritis | 1 | ✅ Selesai | Branch `fix/real-behavior` | Dieliminasi dari `blockchain_config.dart`, `graphql_provider.dart`, `payment_controller.dart`. Check 7 Reality Guard lolos hijau. | 2026-11-17 |
 | **F-21** | Blok `catch (_) {}` kosong total tanpa logging ditemukan di 14 titik | Tinggi | 2/3/4 | ✅ Selesai | Branch `fix/real-behavior` | Seluruh blok catch kosong di `lib/` telah disanitasi 100% (grep: 0 hit). Check Reality Guard hijau. | 2026-11-18 |
@@ -217,3 +217,30 @@
   - Pengujian level L1 (unit, kriptografi matematis, parsing ASN.1, dan state machine transceiver) telah lulus 100% tanpa mock cheating pada lapisan algoritma.
   - Pengujian level L4 (gesekan paspor fisik pada perangkat Android nyata dengan antena NFC) tercatat berstatus **Tertunda / Memerlukan Perangkat Fisik (Pending Physical Hardware)** karena lingkungan eksekusi adalah server Linux headless tanpa controller NFC eksternal dan tanpa buku paspor elektronik fisik timbal-balik. Hal ini dicatat secara transparan dan jujur tanpa memalsukan tanda kelulusan hardware.
 - **Status Akhir Phase 8:** Selesai 100% (Komponen perangkat lunak, kriptografi ICAO 9303, integrasi UI, dan trust store tuntas). Siap melangkah ke Phase 9 (Pelabelan Eksplisit Simulasi Liveness Wajah).
+
+### 21 November 2026 - Phase 9 Execution
+- **Pelabelan Eksplisit Simulasi Liveness Wajah (F-18 & Golden Rule R4):**
+  - Mengintegrasikan lencana permanen `SIMULASI / DEMO` non-dismissible pada Step 3 (`ScrLiveness`) di `PassportVerificationFlowScreen`, menjamin modul dummy berlabel jelas dan tidak dapat disembunyikan.
+  - Mengeliminasi klaim palsu biometrik asli: teks `'Biometric Face Match'` digantikan dengan `'Facial Liveness (Simulasi)'`, label step menjadi `'Liveness (Demo)'`, dan tombol navigasi diubah menjadi `'Continue to face check (Simulated)'`.
+  - Mengeliminasi teks skor palsu `'MATCH SCORE: 98.7%'` dan `'Genuine biometric match'`; digantikan dengan `'Simulasi: lolos'` disertai teks disclaimer eksplisit: `'Skor simulasi 98.7% (demo) · Biometrik TIDAK diverifikasi'` serta badge amber `'SIMULASI'`.
+  - Menambahkan watermark overlay `'SIMULASI'` pada circular viewfinder kamera dan disclaimer transparansi di footer: `'Modul simulasi berlabel resmi (R4) · Zero PII cloud transmission'`.
+  - Mengonfigurasi `SingleChildScrollView` pada tampilan liveness untuk mencegah layout overflow pada layar resolusi rendah/kecil.
+- **Konfigurasi `LIVENESS_MODE` & Hook Masa Depan (Phase 9.2):**
+  - Mengintegrasikan `AppConfig.effectiveLivenessMode` dan setter pengujian `@visibleForTesting` untuk memungkinkan konfigurasi mode liveness (`simulated` vs `real`) tanpa modifikasi kode produksi.
+- **Pencatatan Struktur Liveness Otoritatif di Kredensial & Audit (Phase 9.3):**
+  - Memperbarui `BtidCredentialModel` dengan field `final Map<String, dynamic> liveness`, getter `isBiometricVerified` (selalu false untuk simulated), dan `livenessMode`.
+  - Menegakkan aturan Anti-Fake Pass di deserialisasi `BtidCredentialModel.fromJson`: jika mode bernilai `'SIMULATED'`, field `verified` dipaksa bernilai `false` bahkan jika payload eksternal mencoba menyuntikkan `verified: true`.
+  - Memperbarui `AuditTransactionModel` dengan field `final Map<String, dynamic>? liveness`.
+  - Memperbarui `BtidIssuanceService` agar menyertakan payload `liveness: {mode: 'SIMULATED', verified: false}` pada request penerbitan BTID ke `ezsign-core` dan menyematkannya ke kredensial terbitan.
+  - Memperbarui `VerificationTransactionService.recordCredentialIssuedAudit` agar mencatat metadata audit kredensial dengan struktur liveness simulasi yang transparan.
+- **Sanitasi Layar BTID & Profil Identitas (Phase 9.3 #2):**
+  - Memperbarui modal detail keamanan di `TabId` (`_showSecurityDetails`): mengganti baris `'Biometric 1:1 Match'` berstatus sukses menjadi `'Facial Liveness'` berlabel `'Simulasi: lolos (mode: SIMULATED)'` dengan ikon science amber dan `isSuccess: false`. Menjadikan modal scrollable (`isScrollControlled: true`) untuk mencegah overflow.
+  - Memperbarui `BtidCardWidget`: menambahkan pill eksplisit `Liveness: SIMULATED` bersanding dengan `Identity Verified` dan `Passport Authenticated`, menjamin kartu identitas turis tidak pernah mengklaim "Biometric verified" sebagai fakta.
+- **Penegakan Reality Guard CI (Check 13 / Phase 9.5):**
+  - Menambahkan aturan Check 13 pada `tools/reality_guard.sh` untuk mendeteksi dan menggagalkan build jika terdapat klaim biometrik terverifikasi atau asli (`genuine biometric`, `biometric verified`) di `lib/`.
+  - `bash tools/reality_guard.sh` kini **HIJAU 100% (Seluruh 13 aturan lolos)**.
+- **Pengujian Unit, Model & Widget Komprehensif L1/L4 (Phase 9.5):**
+  - Dibuat 10 pengujian otomatis di `test/phase9_liveness_simulation_test.dart` (default AppConfig, test override reset, serialisasi/deserialisasi model BTID & Audit, anti-fake pass coercion, pengiriman payload layanan BTID & audit ezsign-core, widget stepper & liveness completion, TabId security details honest display, dan BtidCardWidget simulation badge).
+  - Mengoreksi timeout issue pada `test/phase7_merchant_handshake_test.dart` dengan menyediakan mockHttpClient terintegrasi untuk endpoint `/verification/requests`.
+  - Total pengujian aktif seluruh proyek kini **205/205 lulus 100% (0 failed)**.
+- **Status Akhir Phase 9:** Selesai 100%. Seluruh KPI Phase 9 terpenuhi tanpa fake pass. Siap melangkah ke Phase 10 (Pengujian Lapangan Lintas Level & Reality Gate Final).

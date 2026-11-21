@@ -74,6 +74,7 @@ class AppConfig {
         defaultValue: '0x3565E871c841A8cE127B0e05Eb512a865F93845B',
       );
   static String? _testBapendaTreasury;
+  static String? _testLivenessMode;
 
   /// Allows test suites to provide mocks or sandbox endpoints without violating immutability in production.
   @visibleForTesting
@@ -81,10 +82,12 @@ class AppConfig {
     String? rpcUrl,
     String? ezsignUrl,
     String? bapendaTreasuryAddress,
+    String? livenessMode,
   }) {
     _testRpcUrl = rpcUrl;
     _testEzsignUrl = ezsignUrl;
     _testBapendaTreasury = bapendaTreasuryAddress;
+    _testLivenessMode = livenessMode;
   }
 
   /// Resets test overrides to compiled environment constants.
@@ -93,6 +96,7 @@ class AppConfig {
     _testRpcUrl = null;
     _testEzsignUrl = null;
     _testBapendaTreasury = null;
+    _testLivenessMode = null;
   }
 
   /// Liveness mode: 'simulated' (the only permitted dummy module per §0.2) or 'real'.
@@ -101,11 +105,14 @@ class AppConfig {
     defaultValue: 'simulated',
   );
 
+  /// Effective liveness mode considering test overrides.
+  static String get effectiveLivenessMode => _testLivenessMode ?? livenessMode;
+
   // Helper flags
   static bool get isDev => flavor == 'dev';
   static bool get isStaging => flavor == 'staging';
   static bool get isProd => flavor == 'prod';
-  static bool get isSimulatedLiveness => livenessMode == 'simulated';
+  static bool get isSimulatedLiveness => effectiveLivenessMode == 'simulated';
 
   /// Returns a sanitized map of public configurations (safe for debug logs).
   static Map<String, dynamic> toSanitizedMap() {
@@ -122,7 +129,7 @@ class AppConfig {
       'idrtSymbol': idrtSymbol,
       'idrtDecimals': idrtDecimals,
       'bapendaTreasuryAddress': bapendaTreasuryAddress,
-      'livenessMode': livenessMode,
+      'livenessMode': effectiveLivenessMode,
       'kDebugMode': kDebugMode,
     };
   }

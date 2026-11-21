@@ -158,6 +158,7 @@ class BtidIssuanceService {
 
     // 5. Kirim POST /credentials/btid ke ezsign-core server
     final endpoint = _buildUri('/credentials/btid');
+    final effectiveLivenessMode = AppConfig.effectiveLivenessMode.toUpperCase();
     final requestPayload = {
       'passportHash': passportHash,
       'walletAddress': cleanWallet,
@@ -168,7 +169,11 @@ class BtidIssuanceService {
       'visaType': resolvedImmigration.visaType,
       'stayExpiry': resolvedImmigration.stayExpiry,
       'visaSource': resolvedImmigration.source,
-      'livenessMode': 'SIMULATED',
+      'livenessMode': effectiveLivenessMode,
+      'liveness': {
+        'mode': effectiveLivenessMode,
+        'verified': false,
+      },
     };
 
     http.Response response;
@@ -237,6 +242,10 @@ class BtidIssuanceService {
       issuedAt: issuedAt,
       anchorTxHash: anchorTxHash,
       immigrationSource: resolvedImmigration.source,
+      liveness: {
+        'mode': effectiveLivenessMode,
+        'verified': false,
+      },
     );
   }
 

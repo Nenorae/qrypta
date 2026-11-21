@@ -23,6 +23,7 @@ class AuditTransactionModel {
   final String? lastError;
   final String? actorWallet;
   final String? actorRef;
+  final Map<String, dynamic>? liveness;
 
   const AuditTransactionModel({
     required this.auditRef,
@@ -43,6 +44,7 @@ class AuditTransactionModel {
     this.lastError,
     this.actorWallet,
     this.actorRef,
+    this.liveness,
   });
 
   bool get isApproved => status.toLowerCase() == 'approved';
@@ -71,6 +73,7 @@ class AuditTransactionModel {
     String? lastError,
     String? actorWallet,
     String? actorRef,
+    Map<String, dynamic>? liveness,
   }) {
     return AuditTransactionModel(
       auditRef: auditRef ?? this.auditRef,
@@ -91,6 +94,7 @@ class AuditTransactionModel {
       lastError: lastError ?? this.lastError,
       actorWallet: actorWallet ?? this.actorWallet,
       actorRef: actorRef ?? this.actorRef,
+      liveness: liveness ?? this.liveness,
     );
   }
 
@@ -114,6 +118,7 @@ class AuditTransactionModel {
       'lastError': lastError,
       'actorWallet': actorWallet,
       'actorRef': actorRef,
+      'liveness': liveness,
     };
   }
 
@@ -121,6 +126,11 @@ class AuditTransactionModel {
     // Record lama tanpa field syncStatus otomatis ditandai legacy_unverified
     final rawSyncStatus = json['syncStatus'] as String?;
     final syncStatus = rawSyncStatus ?? 'legacy_unverified';
+
+    final livenessRaw = json['liveness'];
+    final liveness = (livenessRaw is Map)
+        ? Map<String, dynamic>.from(livenessRaw)
+        : null;
 
     return AuditTransactionModel(
       auditRef: json['auditRef'] as String? ?? 'AUD-000000',
@@ -145,6 +155,7 @@ class AuditTransactionModel {
       lastError: json['lastError'] as String?,
       actorWallet: json['actorWallet'] as String?,
       actorRef: json['actorRef'] as String?,
+      liveness: liveness,
     );
   }
 }

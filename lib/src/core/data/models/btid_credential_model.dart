@@ -1,5 +1,7 @@
 // lib/src/core/data/models/btid_credential_model.dart
 
+import 'package:qrypta/src/core/config/app_config.dart';
+
 class BtidCredentialModel {
   final String btidNumber;
   final String fullName;
@@ -17,6 +19,7 @@ class BtidCredentialModel {
   final DateTime issuedAt;
   final String? anchorTxHash;
   final String immigrationSource;
+  final Map<String, dynamic> liveness;
 
   const BtidCredentialModel({
     required this.btidNumber,
@@ -35,9 +38,15 @@ class BtidCredentialModel {
     required this.issuedAt,
     this.anchorTxHash,
     this.immigrationSource = 'self_declared',
+    this.liveness = const {
+      'mode': 'SIMULATED',
+      'verified': false,
+    },
   });
 
   bool get isLevyPaid => levyStatus.toLowerCase() == 'paid';
+  bool get isBiometricVerified => liveness['verified'] == true;
+  String get livenessMode => liveness['mode']?.toString() ?? 'SIMULATED';
 
   int get daysRemaining {
     try {
@@ -66,6 +75,7 @@ class BtidCredentialModel {
     DateTime? issuedAt,
     String? anchorTxHash,
     String? immigrationSource,
+    Map<String, dynamic>? liveness,
   }) {
     return BtidCredentialModel(
       btidNumber: btidNumber ?? this.btidNumber,
@@ -84,6 +94,7 @@ class BtidCredentialModel {
       issuedAt: issuedAt ?? this.issuedAt,
       anchorTxHash: anchorTxHash ?? this.anchorTxHash,
       immigrationSource: immigrationSource ?? this.immigrationSource,
+      liveness: liveness ?? this.liveness,
     );
   }
 
@@ -105,6 +116,7 @@ class BtidCredentialModel {
       'issuedAt': issuedAt.toIso8601String(),
       'anchorTxHash': anchorTxHash,
       'immigrationSource': immigrationSource,
+      'liveness': liveness,
     };
   }
 
@@ -134,6 +146,21 @@ class BtidCredentialModel {
       throw const FormatException('Missing required field: nationality');
     }
 
+    final livenessRaw = json['liveness'];
+    Map<String, dynamic> parsedLiveness;
+    if (livenessRaw is Map) {
+      parsedLiveness = Map<String, dynamic>.from(livenessRaw);
+      // Sesuai Golden Rule R4 & Phase 9.3: Mode SIMULATED tidak pernah memiliki verified = true
+      if (parsedLiveness['mode']?.toString().toUpperCase() == 'SIMULATED') {
+        parsedLiveness['verified'] = false;
+      }
+    } else {
+      parsedLiveness = {
+        'mode': (json['livenessMode'] as String? ?? AppConfig.effectiveLivenessMode).toUpperCase(),
+        'verified': false,
+      };
+    }
+
     return BtidCredentialModel(
       btidNumber: btid,
       fullName: fullName,
@@ -153,6 +180,7 @@ class BtidCredentialModel {
           : DateTime.now(),
       anchorTxHash: json['anchorTxHash'] as String?,
       immigrationSource: json['immigrationSource'] as String? ?? 'self_declared',
+      liveness: parsedLiveness,
     );
   }
 }

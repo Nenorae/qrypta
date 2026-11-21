@@ -185,6 +185,7 @@ class TabId extends ConsumerWidget {
   void _showSecurityDetails(BuildContext context, dynamic btidCred) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF111827),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -193,10 +194,11 @@ class TabId extends ConsumerWidget {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -223,7 +225,13 @@ class TabId extends ConsumerWidget {
                 const SizedBox(height: 14),
                 _buildSecurityRow('Chip Authenticity', 'Passive Auth (ICAO 9303 SOD Validated)', true),
                 _buildSecurityRow('Document Signer (DS)', 'HM Passport Office (UK CSCA Anchor)', true),
-                _buildSecurityRow('Biometric 1:1 Match', 'Score: 98.7% (Threshold: 85.0%)', true),
+                _buildSecurityRow(
+                  'Facial Liveness',
+                  'Simulasi: lolos (mode: SIMULATED)',
+                  false,
+                  statusColor: const Color(0xFFF59E0B),
+                  customIcon: Icons.science_outlined,
+                ),
                 _buildSecurityRow('Linked EVM Wallet', _maskAddr(btidCred.walletAddress), true),
                 _buildSecurityRow('Ledger Network', BlockchainConfig.name, true),
                 _buildSecurityRow('Audit Trail', 'ezsign-core Fastify AMQP Worker', true),
@@ -231,12 +239,22 @@ class TabId extends ConsumerWidget {
               ],
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
   }
 
-  Widget _buildSecurityRow(String label, String value, bool isSuccess) {
+  Widget _buildSecurityRow(
+    String label,
+    String value,
+    bool isSuccess, {
+    Color? statusColor,
+    IconData? customIcon,
+  }) {
+    final effectiveColor = statusColor ?? (isSuccess ? const Color(0xFF34D399) : Colors.white);
+    final effectiveIcon = customIcon ?? (isSuccess ? Icons.check_circle_rounded : null);
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7.0),
       child: Row(
@@ -247,16 +265,16 @@ class TabId extends ConsumerWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (isSuccess) ...[
-                  const Icon(Icons.check_circle_rounded, color: Color(0xFF34D399), size: 14),
+                if (effectiveIcon != null) ...[
+                  Icon(effectiveIcon, color: effectiveColor, size: 14),
                   const SizedBox(width: 5),
                 ],
                 Flexible(
                   child: Text(
                     value,
                     textAlign: TextAlign.right,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: effectiveColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),

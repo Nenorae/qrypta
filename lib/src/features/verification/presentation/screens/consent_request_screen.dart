@@ -12,6 +12,15 @@ import 'package:qrypta/src/features/authentication/presentation/providers/btid_p
 import 'package:qrypta/src/features/verification/data/policy_matrix_constants.dart';
 import 'package:qrypta/src/features/verification/logic/verification_controller.dart';
 import 'package:qrypta/src/features/verification/presentation/screens/consent_shared_screen.dart';
+import 'package:qrypta/src/features/verification/presentation/widgets/consent_attribute_tile.dart';
+import 'package:qrypta/src/features/verification/presentation/widgets/consent_biometric_guarantee.dart';
+import 'package:qrypta/src/features/verification/presentation/widgets/consent_clarification_dialog.dart';
+import 'package:qrypta/src/features/verification/presentation/widgets/consent_merchant_header.dart';
+
+export 'package:qrypta/src/features/verification/presentation/widgets/consent_attribute_tile.dart';
+export 'package:qrypta/src/features/verification/presentation/widgets/consent_biometric_guarantee.dart';
+export 'package:qrypta/src/features/verification/presentation/widgets/consent_clarification_dialog.dart';
+export 'package:qrypta/src/features/verification/presentation/widgets/consent_merchant_header.dart';
 
 class ConsentRequestScreen extends ConsumerStatefulWidget {
   final ConsentRequestModel request;
@@ -218,64 +227,9 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
   }
 
   void _showAskMerchantDialog() {
-    showDialog(
+    ConsentClarificationDialog.show(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF131D2D),
-        title: Text(
-          'Ask ${widget.request.staffName}',
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select clarification to send to merchant terminal:',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
-            _buildClarificationOption(ctx, 'Why do you need my passport number?'),
-            _buildClarificationOption(ctx, 'Can I check in without date of birth?'),
-            _buildClarificationOption(ctx, 'What is your regional data retention policy?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildClarificationOption(BuildContext ctx, String text) {
-    return InkWell(
-      onTap: () {
-        Navigator.pop(ctx);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Clarification sent to ${widget.request.staffName}'),
-            backgroundColor: const Color(0xFF0D9488),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: Row(
-          children: [
-            const Icon(Icons.help_outline_rounded, size: 16, color: Color(0xFF2DD4BF)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text,
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ),
-          ],
-        ),
-      ),
+      staffName: widget.request.staffName,
     );
   }
 
@@ -341,88 +295,7 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Merchant Header Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF131D2D),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.accent.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.accent.withValues(alpha: 0.15),
-                              border: Border.all(color: AppColors.accent),
-                            ),
-                            child: const Icon(
-                              Icons.storefront_rounded,
-                              color: AppColors.accent,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        widget.request.merchantName,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF0D9488).withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Text(
-                                        'Verified',
-                                        style: TextStyle(
-                                          color: Color(0xFF2DD4BF),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${widget.request.staffName} · ${widget.request.staffRole}',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Purpose: ${widget.request.purposeTemplate.replaceAll('_', ' ').toUpperCase()}',
-                                  style: TextStyle(
-                                    color: AppColors.accent.withValues(alpha: 0.9),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ConsentMerchantHeader(request: widget.request),
                     const SizedBox(height: 18),
 
                     // Section Title
@@ -456,132 +329,30 @@ class _ConsentRequestScreenState extends ConsumerState<ConsentRequestScreen> {
                       final value = _resolveAttributeValue(fieldKey);
                       final isSelected = _selectedFields.contains(fieldKey);
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0C1322),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? const Color(0xFF2DD4BF).withValues(alpha: 0.3)
-                                : Colors.white10,
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Checkbox(
-                              value: isSelected,
-                              activeColor: const Color(0xFF2DD4BF),
-                              checkColor: const Color(0xFF080D1A),
-                              onChanged: (val) {
-                                setState(() {
-                                  if (val == true) {
-                                    _selectedFields.add(fieldKey);
-                                  } else {
-                                    // Cegah uncheck jika atribut tunggal
-                                    if (_selectedFields.length > 1) {
-                                      _selectedFields.remove(fieldKey);
-                                    }
-                                  }
-                                });
-                              },
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        label,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      Text(
-                                        value,
-                                        style: const TextStyle(
-                                          color: Color(0xFF5EEAD4),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    reason,
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.5),
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                      return ConsentAttributeTile(
+                        label: label,
+                        value: value,
+                        reason: reason,
+                        isSelected: isSelected,
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selectedFields.add(fieldKey);
+                            } else {
+                              if (_selectedFields.length > 1) {
+                                _selectedFields.remove(fieldKey);
+                              }
+                            }
+                          });
+                        },
                       );
                     }),
 
                     const SizedBox(height: 12),
 
-                    // Klausul Retensi Data
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF131D2D),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white10),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.access_time_rounded, size: 16, color: Colors.white60),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              widget.request.retentionPolicy,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.75),
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Biometric Protection Guarantee
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1C1A2E),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFA78BFA).withValues(alpha: 0.2)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.shield_outlined, size: 16, color: Color(0xFFA78BFA)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: const Text(
-                              'Never shared: Biometric template, live face capture, and full passport chip contents.',
-                              style: TextStyle(
-                                color: Color(0xFFA78BFA),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    // Klausul Retensi Data & Biometric Guarantee
+                    ConsentBiometricGuarantee(
+                      retentionPolicy: widget.request.retentionPolicy,
                     ),
                     const SizedBox(height: 20),
                   ],

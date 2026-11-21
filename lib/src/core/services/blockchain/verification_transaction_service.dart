@@ -2,11 +2,11 @@
 
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:qrypta/src/core/config/app_config.dart';
 import 'package:qrypta/src/core/config/blockchain_config.dart';
 import 'package:qrypta/src/core/data/models/actor_ref.dart';
 import 'package:qrypta/src/core/data/models/audit_transaction_model.dart';
@@ -15,25 +15,39 @@ import 'package:qrypta/src/core/error/app_failure.dart';
 import 'package:qrypta/src/core/error/network_exception_adapter.dart';
 import 'package:qrypta/src/core/outbox/outbox_item.dart';
 import 'package:qrypta/src/core/outbox/outbox_repository.dart';
+import 'package:qrypta/src/core/services/blockchain/audit_dispatcher_service.dart';
+import 'package:qrypta/src/core/services/blockchain/audit_storage_service.dart';
+import 'package:qrypta/src/core/services/blockchain/dynamic_qr_crypto_service.dart';
 import 'package:qrypta/src/core/utils/uuid_util.dart';
 import 'package:web3dart/crypto.dart';
 import 'package:web3dart/web3dart.dart';
+
+export 'audit_dispatcher_service.dart';
+export 'audit_storage_service.dart';
+export 'dynamic_qr_crypto_service.dart';
 
 class VerificationTransactionService {
   final Web3Client? _web3Client;
   final http.Client _httpClient;
   final OutboxRepository _outboxRepository;
-  static const String _boxName = 'audit_transactions_box';
+  final AuditStorageService _auditStorage;
+  late final AuditDispatcherService _auditDispatcher;
   static const String _serviceName = 'VerificationTxService';
-
-  final List<AuditTransactionModel> _memoryAuditCache = [];
 
   VerificationTransactionService([
     this._web3Client,
     http.Client? httpClient,
     OutboxRepository? outboxRepository,
+    AuditStorageService? auditStorage,
   ])  : _httpClient = httpClient ?? http.Client(),
-        _outboxRepository = outboxRepository ?? OutboxRepository();
+        _outboxRepository = outboxRepository ?? OutboxRepository(),
+        _auditStorage = auditStorage ?? AuditStorageService() {
+    _auditDispatcher = AuditDispatcherService(
+      httpClient: _httpClient,
+      outboxRepository: _outboxRepository,
+      saveAuditCallback: _auditStorage.saveAuditTransaction,
+    );
+  }
 
   Web3Client? get web3Client => _web3Client;
 
@@ -45,114 +59,25 @@ class VerificationTransactionService {
     String? privateKeyHex,
     String? customSessionId,
     String? customNonce,
-  }) {
-    if (btid.isEmpty) {
-      throw const ValidationFailure('BTID tidak boleh kosong saat membuat token QR dinamis.');
-    }
-    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-    final random = Random.secure();
-    final tokenCode = StringBuffer('QRT-');
-    for (int i = 0; i < 10; i++) {
-      tokenCode.write(chars[random.nextInt(chars.length)]);
-    }
-
-    final sessionId = customSessionId ?? UuidUtil.generateV4();
-    final nonceBytes = Uint8List(16);
-    for (int i = 0; i < 16; i++) {
-      nonceBytes[i] = random.nextInt(256);
-    }
-    final nonce = customNonce ?? '0x${bytesToHex(nonceBytes)}';
-    final expTimestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000) + validitySeconds;
-
-    String? signatureHex;
-    if (privateKeyHex != null && privateKeyHex.isNotEmpty) {
-      final cleanKey = _cleanHexKey(privateKeyHex);
-      final ethKey = EthPrivateKey.fromHex(cleanKey);
-      final canonicalPayload =
-          'v=1&sessionId=$sessionId&nonce=$nonce&exp=$expTimestamp&wallet=${walletAddress.toLowerCase()}&btid=$btid';
-      final sigBytes = ethKey.signPersonalMessageToUint8List(
-        Uint8List.fromList(utf8.encode(canonicalPayload)),
+  }) =>
+      DynamicQrCryptoService.generateDynamicQrToken(
+        btid,
+        walletAddress,
+        validitySeconds: validitySeconds,
+        privateKeyHex: privateKeyHex,
+        customSessionId: customSessionId,
+        customNonce: customNonce,
       );
-      signatureHex = '0x${bytesToHex(sigBytes)}';
-    }
-
-    final payload = {
-      'v': 1,
-      'sessionId': sessionId,
-      'nonce': nonce,
-      'exp': expTimestamp,
-      'wallet': walletAddress,
-      'btid': btid,
-      'token': tokenCode.toString(),
-      if (signatureHex != null) 'sig': signatureHex,
-    };
-
-    return jsonEncode(payload);
-  }
 
   /// Memverifikasi keabsahan kriptografis dan masa berlaku payload QR Dinamis wisatawan (Phase 7.1).
   static bool verifyDynamicQrToken({
     required Map<String, dynamic> payload,
     int? currentEpochSeconds,
-  }) {
-    final v = payload['v'];
-    final sessionId = payload['sessionId']?.toString();
-    final nonce = payload['nonce']?.toString();
-    final exp = payload['exp'];
-    final wallet = payload['wallet']?.toString();
-    final btid = payload['btid']?.toString();
-    final sig = payload['sig']?.toString();
-
-    if (v != 1 || sessionId == null || nonce == null || exp == null || wallet == null || btid == null) {
-      return false;
-    }
-
-    final expInt = exp is int ? exp : int.tryParse(exp.toString());
-    if (expInt == null) return false;
-
-    final nowSec = currentEpochSeconds ?? (DateTime.now().millisecondsSinceEpoch ~/ 1000);
-    if (expInt <= nowSec) {
-      return false; // Kedaluwarsa
-    }
-
-    if (sig == null || !sig.startsWith('0x') || sig.length < 130) {
-      return false; // Signature tidak ada atau tidak valid
-    }
-
-    try {
-      final canonicalPayload =
-          'v=1&sessionId=$sessionId&nonce=$nonce&exp=$expInt&wallet=${wallet.toLowerCase()}&btid=$btid';
-      final cleanSig = sig.startsWith('0x') ? sig.substring(2) : sig;
-      final sigBytes = hexToBytes(cleanSig);
-
-      var vByte = sigBytes[64];
-      if (vByte < 27) vByte += 27;
-
-      final messageHash = keccak256(
-        Uint8List.fromList(
-          utf8.encode('\x19Ethereum Signed Message:\n${canonicalPayload.length}$canonicalPayload'),
-        ),
+  }) =>
+      DynamicQrCryptoService.verifyDynamicQrToken(
+        payload: payload,
+        currentEpochSeconds: currentEpochSeconds,
       );
-
-      final recoveredPublicKey = ecRecover(
-        messageHash,
-        MsgSignature(
-          bytesToInt(sigBytes.sublist(0, 32)),
-          bytesToInt(sigBytes.sublist(32, 64)),
-          vByte,
-        ),
-      );
-
-      final recoveredAddress = bytesToHex(
-        keccak256(recoveredPublicKey).sublist(12),
-        include0x: true,
-      );
-
-      return recoveredAddress.toLowerCase() == wallet.toLowerCase();
-    } on Object catch (_) {
-      return false;
-    }
-  }
 
   /// Digitally signs canonical consent attributes and submits to ezsign-core Fastify middleware.
   /// Enforces Golden Rule R1, R2, and R7.
@@ -163,7 +88,7 @@ class VerificationTransactionService {
     required bool isApproved,
     ActorRef? actor,
   }) async {
-    final cleanKey = _cleanHexKey(privateKeyHex);
+    final cleanKey = DynamicQrCryptoService.cleanHexKey(privateKeyHex);
     final ethKey = EthPrivateKey.fromHex(cleanKey);
     final nowIso = DateTime.now().toUtc().toIso8601String();
     final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -210,7 +135,7 @@ class VerificationTransactionService {
     );
     final signatureHex = '0x${bytesToHex(signatureBytes)}';
 
-    final auditRef = _generateAuditRef();
+    final auditRef = AuditDispatcherService.generateAuditRef();
     final idempotencyKey = UuidUtil.generateV4();
 
     // 3. Dispatch to ezsign-core Fastify middleware
@@ -349,7 +274,7 @@ class VerificationTransactionService {
     String? merchantName,
     ActorRef? actor,
   }) async {
-    final cleanKey = _cleanHexKey(privateKeyHex);
+    final cleanKey = DynamicQrCryptoService.cleanHexKey(privateKeyHex);
     final ethKey = EthPrivateKey.fromHex(cleanKey);
     final nowIso = DateTime.now().toUtc().toIso8601String();
     final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -378,7 +303,7 @@ class VerificationTransactionService {
     );
     final signatureHex = '0x${bytesToHex(signatureBytes)}';
 
-    final auditRef = _generateAuditRef();
+    final auditRef = AuditDispatcherService.generateAuditRef();
     final idempotencyKey = UuidUtil.generateV4();
 
     final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
@@ -481,110 +406,15 @@ class VerificationTransactionService {
     required String amountFormatted,
     required String walletAddress,
     ActorRef? actor,
-  }) async {
-    final auditRef = _generateAuditRef();
-    final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final idempotencyKey = UuidUtil.generateV4();
-
-    final resolvedActor = actor ??
-        ActorRef.fromCredential(
-          walletAddress: walletAddress,
-          btidNumber: btid,
-        );
-
-    final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
-    final middlewareBody = {
-      'uuid': btid,
-      'client_type': 'web3',
-      'signature': '0x',
-      'docType': 'BTID_LEVY_PAYMENT',
-      'metadata': {
-        'actor': resolvedActor.actorRef,
-        'actorWallet': resolvedActor.walletAddress,
-        'actorRef': resolvedActor.actorRef,
-        'org': 'Bali Tourism Authority (Bapenda)',
-        'role': 'Tourist',
-        'action': 'Tourist Levy paid ($amountFormatted)',
-        'purpose': 'Official Bali Tourist Levy Settlement',
-        'record': levyRef,
-        'result': 'Paid',
-        'amount': amountFormatted,
-        'walletAddress': walletAddress,
-        'txHash': txHash,
-        'auditRef': auditRef,
-      },
-      'timestamp': nowEpoch,
-    };
-
-    String syncStatus = 'synced';
-    String? serverCorrelationId;
-    String? lastError;
-
-    try {
-      final response = await _httpClient.post(
-        middlewareEndpoint,
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
-        body: jsonEncode(middlewareBody),
-      ).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          final resJson = jsonDecode(response.body);
-          if (resJson is Map<String, dynamic>) {
-            serverCorrelationId = resJson['correlation_id']?.toString() ??
-                resJson['data']?['txHash']?.toString();
-          }
-        } on Object catch (e) {
-          developer.log('Respon body non-JSON: $e', name: _serviceName);
-          throw ServerRejected('Respons body bukan format JSON valid dari server: $e', response.statusCode, 'NON_JSON_RESPONSE');
-        }
-      } else {
-        throw NetworkExceptionAdapter.fromHttpResponse(
-          response.statusCode,
-          response.body,
-        );
-      }
-    } on Object catch (e) {
-      developer.log('Pencatatan audit levy server tertunda, dialihkan ke outbox: $e', name: _serviceName);
-      syncStatus = 'pending_sync';
-      lastError = 'Audit server tertunda. Transaksi on-chain tetap sah.';
-
-      await _outboxRepository.enqueue(
-        OutboxItem(
-          id: idempotencyKey,
-          type: 'audit_levy',
-          endpoint: '/verify-identity',
-          payload: middlewareBody,
-          nextAttemptAt: DateTime.now().add(const Duration(seconds: 5)),
-          createdAt: DateTime.now(),
-        ),
+  }) =>
+      _auditDispatcher.recordLevyPaymentAudit(
+        levyRef: levyRef,
+        txHash: txHash,
+        btid: btid,
+        amountFormatted: amountFormatted,
+        walletAddress: walletAddress,
+        actor: actor,
       );
-    }
-
-    final audit = AuditTransactionModel(
-      auditRef: auditRef,
-      txRef: levyRef,
-      txHash: txHash,
-      actor: resolvedActor.name?.isNotEmpty == true ? resolvedActor.name! : resolvedActor.actorRef,
-      organisation: 'Bali Tourism Authority (Bapenda)',
-      action: 'Tourist Levy paid ($amountFormatted)',
-      purpose: 'Official Bali Tourist Levy',
-      sharedAttributesCount: 0,
-      status: 'Paid',
-      timestamp: DateTime.now(),
-      syncStatus: syncStatus,
-      serverId: serverCorrelationId,
-      lastError: lastError,
-      actorWallet: resolvedActor.walletAddress,
-      actorRef: resolvedActor.actorRef,
-    );
-
-    await saveAuditTransaction(audit);
-    return audit;
-  }
 
   /// Records an on-chain QRIS Merchant Payment audit entry and dispatches to ezsign-core.
   Future<AuditTransactionModel> recordQrisPaymentAudit({
@@ -596,293 +426,37 @@ class VerificationTransactionService {
     required String walletAddress,
     String? itemDescription,
     ActorRef? actor,
-  }) async {
-    final auditRef = _generateAuditRef();
-    final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final idempotencyKey = UuidUtil.generateV4();
-
-    final resolvedActor = actor ??
-        ActorRef.fromWallet(
-          walletAddress: walletAddress,
-        );
-
-    final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
-    final middlewareBody = {
-      'uuid': walletAddress,
-      'client_type': 'web3',
-      'signature': '0x',
-      'docType': 'BTID_QRIS_PAYMENT',
-      'metadata': {
-        'actor': resolvedActor.actorRef,
-        'actorWallet': resolvedActor.walletAddress,
-        'actorRef': resolvedActor.actorRef,
-        'org': merchantName,
-        'role': 'Customer',
-        'action': 'QRIS Merchant Payment ($amountFormatted)',
-        'purpose': 'Licensed Payment Settlement',
-        'record': payRef,
-        'merchantId': merchantId,
-        'result': 'Paid',
-        'amount': amountFormatted,
-        'itemDescription': itemDescription ?? 'Merchant settlement',
-        'walletAddress': walletAddress,
-        'txHash': txHash,
-        'auditRef': auditRef,
-        'privacyGuarantee': 'Zero personal data or identity revealed to merchant',
-      },
-      'timestamp': nowEpoch,
-    };
-
-    String syncStatus = 'synced';
-    String? serverCorrelationId;
-    String? lastError;
-
-    try {
-      final response = await _httpClient.post(
-        middlewareEndpoint,
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
-        body: jsonEncode(middlewareBody),
-      ).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          final resJson = jsonDecode(response.body);
-          if (resJson is Map<String, dynamic>) {
-            serverCorrelationId = resJson['correlation_id']?.toString() ??
-                resJson['data']?['txHash']?.toString();
-          }
-        } on Object catch (e) {
-          developer.log('Respon body non-JSON: $e', name: _serviceName);
-          throw ServerRejected('Respons body bukan format JSON valid dari server: $e', response.statusCode, 'NON_JSON_RESPONSE');
-        }
-      } else {
-        throw NetworkExceptionAdapter.fromHttpResponse(
-          response.statusCode,
-          response.body,
-        );
-      }
-    } on Object catch (e) {
-      developer.log('Pencatatan audit QRIS server tertunda, dialihkan ke outbox: $e', name: _serviceName);
-      syncStatus = 'pending_sync';
-      lastError = 'Audit server tertunda. Transaksi on-chain tetap sah.';
-
-      await _outboxRepository.enqueue(
-        OutboxItem(
-          id: idempotencyKey,
-          type: 'audit_qris',
-          endpoint: '/verify-identity',
-          payload: middlewareBody,
-          nextAttemptAt: DateTime.now().add(const Duration(seconds: 5)),
-          createdAt: DateTime.now(),
-        ),
+  }) =>
+      _auditDispatcher.recordQrisPaymentAudit(
+        payRef: payRef,
+        txHash: txHash,
+        merchantName: merchantName,
+        merchantId: merchantId,
+        amountFormatted: amountFormatted,
+        walletAddress: walletAddress,
+        itemDescription: itemDescription,
+        actor: actor,
       );
-    }
-
-    final audit = AuditTransactionModel(
-      auditRef: auditRef,
-      txRef: payRef,
-      txHash: txHash,
-      actor: resolvedActor.name?.isNotEmpty == true ? resolvedActor.name! : resolvedActor.actorRef,
-      organisation: merchantName,
-      action: 'QRIS Payment ($amountFormatted)',
-      purpose: 'Payment Settlement',
-      sharedAttributesCount: 0,
-      status: 'Paid',
-      timestamp: DateTime.now(),
-      syncStatus: syncStatus,
-      serverId: serverCorrelationId,
-      lastError: lastError,
-      actorWallet: resolvedActor.walletAddress,
-      actorRef: resolvedActor.actorRef,
-    );
-
-    await saveAuditTransaction(audit);
-    return audit;
-  }
 
   /// Records a credential issuance audit entry (Fase A - ScrIssued) and dispatches to ezsign-core.
   Future<AuditTransactionModel> recordCredentialIssuedAudit({
     required String btid,
     required String fullName,
     required String walletAddress,
-  }) async {
-    final auditRef = _generateAuditRef();
-    final nowEpoch = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final idempotencyKey = UuidUtil.generateV4();
-
-    final actorRef = ActorRef.fromCredential(
-      walletAddress: walletAddress,
-      btidNumber: btid,
-      name: fullName,
-    );
-
-    final middlewareEndpoint = Uri.parse('${BlockchainConfig.ezsignApiUrl}/verify-identity');
-    final middlewareBody = {
-      'uuid': btid,
-      'client_type': 'web3',
-      'signature': '0x',
-      'docType': 'BTID_ISSUED',
-      'metadata': {
-        'actor': 'System (Bali Tourism Authority)',
-        'actorWallet': walletAddress,
-        'actorRef': actorRef.actorRef,
-        'org': 'Bali Tourism Authority & Immigration',
-        'role': 'Issuer',
-        'action': 'Credential issued',
-        'purpose': 'Identity onboarding',
-        'record': btid,
-        'result': 'Issued',
-        'walletAddress': walletAddress,
-        'auditRef': auditRef,
-      },
-      'timestamp': nowEpoch,
-    };
-
-    String syncStatus = 'synced';
-    String? serverCorrelationId;
-    String? anchorTxHash;
-    String? lastError;
-
-    try {
-      final response = await _httpClient.post(
-        middlewareEndpoint,
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
-        body: jsonEncode(middlewareBody),
-      ).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          final resJson = jsonDecode(response.body);
-          if (resJson is Map<String, dynamic>) {
-            serverCorrelationId = resJson['correlation_id']?.toString() ??
-                resJson['data']?['txHash']?.toString();
-            final rawTx = resJson['data']?['txHash'] ?? resJson['txHash'];
-            if (rawTx != null && rawTx.toString().startsWith('0x')) {
-              anchorTxHash = rawTx.toString();
-            }
-          }
-        } on Object catch (e) {
-          developer.log('Respon body non-JSON: $e', name: _serviceName);
-          throw ServerRejected('Respons body bukan format JSON valid dari server: $e', response.statusCode, 'NON_JSON_RESPONSE');
-        }
-      } else {
-        throw NetworkExceptionAdapter.fromHttpResponse(
-          response.statusCode,
-          response.body,
-        );
-      }
-    } on Object catch (e) {
-      developer.log('Penerbitan audit kredensial dialihkan ke outbox: $e', name: _serviceName);
-      syncStatus = 'pending_sync';
-      lastError = 'Audit kredensial server tertunda.';
-
-      await _outboxRepository.enqueue(
-        OutboxItem(
-          id: idempotencyKey,
-          type: 'audit_credential',
-          endpoint: '/verify-identity',
-          payload: middlewareBody,
-          nextAttemptAt: DateTime.now().add(const Duration(seconds: 5)),
-          createdAt: DateTime.now(),
-        ),
+  }) =>
+      _auditDispatcher.recordCredentialIssuedAudit(
+        btid: btid,
+        fullName: fullName,
+        walletAddress: walletAddress,
       );
-    }
-
-    final audit = AuditTransactionModel(
-      auditRef: auditRef,
-      txRef: btid,
-      txHash: anchorTxHash,
-      actor: fullName,
-      organisation: 'Bali Tourism Authority & Immigration',
-      action: 'Credential issued',
-      purpose: 'Identity onboarding',
-      sharedAttributesCount: 0,
-      status: 'Approved',
-      timestamp: DateTime.now(),
-      syncStatus: syncStatus,
-      serverId: serverCorrelationId,
-      anchorTxHash: anchorTxHash,
-      lastError: lastError,
-      actorWallet: walletAddress,
-      actorRef: actorRef.actorRef,
-    );
-
-    await saveAuditTransaction(audit);
-    return audit;
-  }
 
   /// Persists an audit entry to local Hive storage and in-memory cache.
-  Future<void> saveAuditTransaction(AuditTransactionModel audit) async {
-    try {
-      if (Hive.isBoxOpen(_boxName)) {
-        final box = Hive.box(_boxName);
-        await box.put(audit.txRef, audit.toJson());
-      } else {
-        final box = await Hive.openBox(_boxName);
-        await box.put(audit.txRef, audit.toJson());
-      }
-    } on Object catch (e) {
-      developer.log('Penyimpanan Hive gagal, fallback ke memori isolat: $e', name: _serviceName);
-      final index = _memoryAuditCache.indexWhere((a) => a.txRef == audit.txRef);
-      if (index >= 0) {
-        _memoryAuditCache[index] = audit;
-      } else {
-        _memoryAuditCache.insert(0, audit);
-      }
-    }
-  }
+  Future<void> saveAuditTransaction(AuditTransactionModel audit) =>
+      _auditStorage.saveAuditTransaction(audit);
 
   /// Retrieves full audit transaction history.
-  Future<List<AuditTransactionModel>> getAuditTransactions() async {
-    final List<AuditTransactionModel> results = [];
-
-    try {
-      Box box;
-      if (Hive.isBoxOpen(_boxName)) {
-        box = Hive.box(_boxName);
-      } else {
-        box = await Hive.openBox(_boxName);
-      }
-
-      for (final key in box.keys) {
-        final raw = box.get(key);
-        if (raw is Map) {
-          final map = Map<String, dynamic>.from(raw);
-          results.add(AuditTransactionModel.fromJson(map));
-        }
-      }
-    } on Object catch (e) {
-      developer.log('Pembacaan Hive audit gagal, mengambil dari memori: $e', name: _serviceName);
-      results.addAll(_memoryAuditCache);
-    }
-
-    if (results.isEmpty && _memoryAuditCache.isNotEmpty) {
-      results.addAll(_memoryAuditCache);
-    }
-
-    results.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return results;
-  }
-
-  static String _cleanHexKey(String key) {
-    var k = key.trim();
-    if (k.startsWith('0x') || k.startsWith('0X')) {
-      k = k.substring(2);
-    }
-    return k.padLeft(64, '0');
-  }
-
-  static String _generateAuditRef() {
-    final rand = Random();
-    final num = 100000 + rand.nextInt(900000);
-    return 'AUD-$num';
-  }
+  Future<List<AuditTransactionModel>> getAuditTransactions() =>
+      _auditStorage.getAuditTransactions();
 
   void dispose() {
     _httpClient.close();

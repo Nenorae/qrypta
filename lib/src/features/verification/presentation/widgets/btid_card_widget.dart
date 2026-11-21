@@ -291,6 +291,11 @@ class BtidCardWidget extends StatelessWidget {
                         color: const Color(0xFFA78BFA),
                       ),
                       _buildPill(
+                        icon: Icons.science_outlined,
+                        label: 'Liveness: SIMULATED',
+                        color: const Color(0xFFF59E0B),
+                      ),
+                      _buildPill(
                         icon: credential.isLevyPaid
                             ? Icons.check_circle_rounded
                             : Icons.access_time_rounded,
